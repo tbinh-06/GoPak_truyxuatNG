@@ -156,6 +156,34 @@ h1,h2,h3,.display{font-family:"Archivo","Inter",sans-serif;letter-spacing:-0.015
   font-size:12.5px;color:rgba(255,255,255,.7);max-width:620px;}
 .btn-ghost.on{border-color:#f0d9a0;color:#ffe9b8;}
 
+/* ── Accordion + nhãn EUDR ──────────────────────────────────── */
+.acc{border:1px solid var(--line);background:var(--card-2);padding:12px 16px;margin-top:14px;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--ink-2);}
+.acc:hover{background:#f2efe8;}
+.acc .chev{transition:transform .2s;display:inline-block;color:var(--ink-3);}
+.acc.open .chev{transform:rotate(180deg);}
+.acc-body{display:none;}
+.acc-body.open{display:block;}
+.eudr{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--kraft);border:1px solid #e4d6bd;background:var(--kraft-soft);
+  padding:3px 9px;border-radius:2px;}
+.sec-head .eudr{margin-left:auto;}
+.dir-btn{background:var(--card);border:1px solid var(--line);color:var(--ink-2);font-size:11.5px;
+  font-weight:600;padding:6px 12px;border-radius:2px;cursor:pointer;font-family:"Inter";}
+.dir-btn:hover{background:var(--card-2);}
+.tape-head{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:14px 24px;border-bottom:1px solid var(--line-2);}
+.tape-head .t{font-family:"Archivo";font-size:13.5px;font-weight:700;}
+.tape-head .s{font-size:11.5px;color:var(--ink-3);}
+.vrow.head-node .vdot{background:var(--forest);}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  border:1px solid var(--line);background:var(--card);}
+.summary-grid .cellx{padding:15px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);}
+.summary-grid .cellx .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin-bottom:5px;}
+.summary-grid .cellx .v{font-size:14px;font-weight:600;line-height:1.35;}
+.summary-grid .cellx .v.miss{color:var(--red);}
+
 /* ── Bảng ───────────────────────────────────────────────────── */
 .tbl-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-top:none;}
 table.data{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -443,22 +471,334 @@ function buildPo(po) {
            lots: isMain ? LOTS : [], rolls: isMain ? ROLLS : [] };
 }
 
+/* ══════════════════════════════════════════════════════════════
+   HỒ SƠ ĐƠN HÀNG — bố cục theo đúng trình tự chuỗi cung ứng,
+   mỗi mục gắn với một nhóm dữ liệu EUDR bắt buộc (Điều 9 Quy định
+   (EU) 2023/1115). Chi tiết bút toán gốc nằm trong phần mở rộng
+   để mặt chính chỉ hiển thị thông tin cần cho hồ sơ tuân thủ.
+   ══════════════════════════════════════════════════════════════ */
+
+function eudrTag(art, label) {
+  return `<span class="eudr" title="Quy định (EU) 2023/1115">EUDR ${esc(art)}${label ? ' · ' + esc(label) : ''}</span>`;
+}
+
+let accSeq = 0;
+function accordion(title, sub, content, open) {
+  const id = 'acc' + (++accSeq);
+  return `<div class="acc${open ? ' open' : ''}" onclick="toggleAcc('${id}')" id="${id}h">
+      <span>${title}${sub ? ` <span style="font-weight:400;color:var(--ink-3)"> · ${sub}</span>` : ''}</span>
+      <span class="chev">⌄</span></div>
+    <div class="acc-body${open ? ' open' : ''}" id="${id}">${content}</div>`;
+}
+window.toggleAcc = function (id) {
+  $(id).classList.toggle('open');
+  $(id + 'h').classList.toggle('open');
+};
+
+function sgrid(cells) {
+  return `<div class="summary-grid">${cells.map(c =>
+    `<div class="cellx"><div class="k">${esc(c[0])}</div><div class="v${c[2] ? ' miss' : ''}">${c[1]}</div></div>`).join('')}</div>`;
+}
+
+/* ── Bộ điểm dữ liệu EUDR của hồ sơ ─────────────────────────── */
+function eudrPoints(rec, forests, ddsCodes) {
+  const S = SIM_ON && rec.isMain;
+  const outQty = rec.output.reduce((s, r) => s + (num(r.qty) || 0), 0);
+  return [
+    { art: '9(1)(a)', t: 'Mô tả sản phẩm & mã HS', ok: 0, partial: 1,
+      s: `Có tên và mã thành phẩm ${esc(rec.fgCodes.join(', '))}. Chưa có mã HS trong dữ liệu.` },
+    { art: '9(1)(b)', t: 'Khối lượng', ok: 0, partial: 1,
+      s: `Có ${fmt(outQty)} thùng theo ERP. EUDR yêu cầu khối lượng tịnh (kg) — chưa có trong ledger.` },
+    { art: '9(1)(c)', t: 'Quốc gia sản xuất', ok: S,
+      s: S ? uniq(forests.map(x => x.f.country)).join(', ') : 'Chưa truy được về quốc gia khai thác.' },
+    { art: '9(1)(d)', t: 'Tọa độ vùng trồng & kỳ khai thác', ok: 0, partial: S,
+      s: S ? 'Có tọa độ tham chiếu và kỳ khai thác của từng khu rừng. Chưa có file GeoJSON ranh giới thửa.'
+           : 'Không có dữ liệu vùng trồng.' },
+    { art: '9(1)(e)', t: 'Thông tin nhà cung cấp', ok: 0, partial: S,
+      s: S ? 'Có tên NCC, chứng nhận CoC, số vận đơn và hóa đơn. Chưa có địa chỉ và email theo yêu cầu.'
+           : 'Không nối được nguyên liệu với nhà cung cấp.' },
+    { art: '9(1)(f)', t: 'Thông tin bên nhận hàng', ok: S,
+      s: S ? `${esc(SHIP.customer)} · ${esc(SHIP.customer_country)}` : 'Chưa có bút toán giao hàng gắn đơn khách.' },
+    { art: '9(1)(g)', t: 'Bằng chứng không phá rừng', ok: 0, partial: S,
+      s: S ? 'Toàn bộ nguồn là rừng trồng có chứng nhận PEFC. EUDR coi chứng nhận là thông tin bổ trợ, cần thêm bằng chứng so với mốc 31/12/2020.'
+           : 'Chưa gắn được chứng nhận vào lô nguyên liệu cụ thể.' },
+    { art: '9(1)(h)', t: 'Bằng chứng hợp pháp', ok: S,
+      s: S ? 'Có mã giấy phép khai thác và mã chứng nhận CoC của từng nguồn.' : 'Chưa có.' },
+    { art: 'Điều 10', t: 'Đánh giá rủi ro quốc gia', ok: S,
+      s: S ? uniq(forests.map(x => x.f.risk)).join(' · ') : 'Chưa đánh giá được do thiếu nguồn gốc.' },
+    { art: 'Điều 4', t: 'Tham chiếu hồ sơ DDS thượng nguồn', ok: S,
+      s: S ? `${ddsCodes.length} hồ sơ DDS gắn trực tiếp vào cuộn nguyên liệu.` : 'DDS chưa nối được với lô nguyên liệu.' }
+  ];
+}
+
+/* ── Sơ đồ chuỗi (tổng quan, đảo chiều được) ────────────────── */
+const STAGE_SEC = { forest: 'sec1', purchase: 'sec2', wh_rw: 'sec3', wh_plan: 'sec3',
+  wh_prod_rm: 'sec3', prod: 'sec4', wh_qc: 'sec4', wh_fg: 'sec4', sale: 'sec5' };
+
+function chainOverview(rec, forests) {
+  const nodes = rec.stages.slice();
+  if (SIM_ON && rec.isMain) nodes.unshift({ id: 'forest', code: 'RỪNG', name: 'Khu rừng nguồn gốc', rows: [], count: forests.length });
+  const links = rec.links.slice();
+  if (SIM_ON && rec.isMain) links.unshift({ key: 'Hồ sơ DDS + B/L No.', type: 'direct' });
+  const dir = window.__DIR || 'down';
+  const order = dir === 'down' ? nodes.map((_, i) => i) : nodes.map((_, i) => nodes.length - 1 - i);
+
+  const rows = order.map((idx, pos) => {
+    const s = nodes[idx];
+    const last = pos === order.length - 1;
+    const lk = dir === 'down' ? links[idx] : links[idx - 1];
+    const n = s.count !== undefined ? s.count : s.rows.length;
+    const label = s.id === 'forest' ? `${n} khu rừng` : (n ? n + ' bút toán' : 'thiếu dữ liệu');
+    const nextCode = last ? '' : nodes[order[pos + 1]].code;
+    const key = last || !lk ? '' :
+      `<div class="vkey">${dir === 'down' ? '↓' : '↑'} nối ${dir === 'down' ? 'sang' : 'về'} ${esc(nextCode)} bằng <b>${esc(lk.key)}</b>${
+        lk.type === 'logic' ? ' · liên kết logic' : lk.type === 'missing' ? ' · chưa có dữ liệu' : ''}</div>`;
+    const cls = [n ? '' : 'empty', last ? 'last' : (lk ? lk.type : ''), s.id === 'forest' ? 'head-node' : ''].join(' ');
+    return `<a class="vrow ${cls}" href="#${STAGE_SEC[s.id] || 'sec1'}" style="text-decoration:none;color:inherit">
+        <div class="vrail"><span class="vdot"></span><span class="vline"></span></div>
+        <div class="vbody"><div class="vhead"><span class="v-code">${esc(s.code)}</span>
+          <span class="v-name">${esc(s.name)}</span>
+          <span class="v-count">${label}</span>
+          ${n && s.rows && s.rows.length && s.rows.every(r => r.sim) ? SIMTAG : ''}</div>${key}</div></a>`;
+  }).join('');
+
+  return `<div class="tape" id="chainTape">
+    <div class="tape-head">
+      <div><div class="t">Chuỗi hành trình · ${dir === 'down' ? 'truy xuôi: rừng → khách hàng' : 'truy ngược: khách hàng → rừng'}</div>
+        <div class="s">Bấm vào một mắt xích để nhảy tới mục dữ liệu tương ứng bên dưới</div></div>
+      <button class="dir-btn" onclick="flipChain()">⇅ Đảo chiều</button>
+    </div>
+    ${rows}
+    <div class="legend">
+      <span><i></i> Nối trực tiếp bằng khóa dữ liệu</span>
+      <span><i class="logic"></i> Nối theo logic (chưa có khóa duy nhất)</span>
+      <span><i class="missing"></i> Thiếu dữ liệu trong NAV</span>
+    </div>
+  </div>`;
+}
+window.flipChain = function () {
+  window.__DIR = (window.__DIR || 'down') === 'down' ? 'up' : 'down';
+  $('chainWrap').innerHTML = chainOverview(window.__REC, window.__FORESTS || []);
+};
+
+/* ── 01 · Nguồn gốc rừng ────────────────────────────────────── */
+function secForest(rec, forests) {
+  if (!forests.length) {
+    return `<div class="section" id="sec1">
+      <div class="sec-head"><span class="sec-num">01</span><h2>Nguồn gốc rừng</h2>${eudrTag('9(1)(c)(d)', 'quốc gia & tọa độ')}</div>
+      <div class="callout">Chưa truy được về khu rừng: nguyên liệu trong ledger không gắn với hồ sơ DDS nào,
+        nên thiếu quốc gia sản xuất, tọa độ vùng trồng và kỳ khai thác — ba dữ liệu bắt buộc của EUDR.</div>
+    </div>`;
+  }
+  const countries = uniq(forests.map(x => x.f.country));
+  const species = uniq(forests.map(x => x.f.scientific));
+  const risks = uniq(forests.map(x => x.f.risk));
+  return `<div class="section" id="sec1">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Nguồn gốc rừng</h2>${eudrTag('9(1)(c)(d)(g)(h)', 'quốc gia · tọa độ · hợp pháp')}</div>
+    ${sgrid([
+      ['Quốc gia sản xuất', countries.map(esc).join(', ')],
+      ['Số khu rừng', forests.length + ' khu · toàn bộ là rừng trồng'],
+      ['Loài cây', species.map(esc).join('; ')],
+      ['Kỳ khai thác', dmy(forests.map(x => x.f.start).sort()[0]) + ' – ' + dmy(forests.map(x => x.f.end).sort().pop())],
+      ['Chứng nhận', 'PEFC Certified'],
+      ['Xếp hạng rủi ro quốc gia', risks.map(esc).join(' · ')]
+    ])}
+    <div class="card" style="margin-top:16px;border-top:none">
+      <div class="map-note">Tọa độ đang ở cấp vùng trồng (mô phỏng). EUDR Điều 9(1)(d) yêu cầu tọa độ đa giác của từng thửa
+        khi diện tích trên 4 ha — cần file GeoJSON do nhà cung cấp gửi kèm hồ sơ DDS.</div>
+      <div id="map"></div>
+    </div>
+    ${accordion('Chi tiết từng khu rừng', forests.length + ' khu rừng', forestTable(forests), true)}
+  </div>`;
+}
+
+/* ── 02 · Nhà cung cấp & hồ sơ DDS ──────────────────────────── */
+function secSupplier(rec, ddsCodes) {
+  if (!ddsCodes.length) {
+    const ref = DDS_LIST[0];
+    return `<div class="section" id="sec2">
+      <div class="sec-head"><span class="sec-num">02</span><h2>Nhà cung cấp và hồ sơ DDS</h2>${eudrTag('9(1)(e)', 'nhà cung cấp')}</div>
+      <div class="callout">Không ghép được hồ sơ DDS cho ${rec.rmItems.length} mã nguyên liệu của đơn hàng này:
+        biểu mẫu DDS lập theo đơn mua của nhà cung cấp, còn NAV ghi theo Item No. — không có trường nối chung.</div>
+      ${accordion('Hồ sơ DDS đang có trong hệ thống', esc(ref.material_item || ref.po_number),
+        `<div style="border:1px solid var(--line);border-top:none;padding:16px 16px 4px">${ddsChainHtml(ref)}</div>`)}
+    </div>`;
+  }
+  const rolls = rec.rolls;
+  const bls = uniq(rolls.map(r => r.bl));
+  return `<div class="section" id="sec2">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Nhà cung cấp và hồ sơ DDS</h2>${eudrTag('9(1)(e) · Điều 4', 'NCC & tham chiếu DDS')}</div>
+    ${sgrid([
+      ['Số nhà cung cấp', uniq(rolls.map(r => r.supplier)).length + ' NCC'],
+      ['Vận đơn nhập khẩu', bls.length + ' B/L'],
+      ['Hồ sơ DDS', ddsCodes.length + ' hồ sơ'],
+      ['Chứng nhận CoC', 'PEFC · 100% certified'],
+      ['Địa chỉ & email NCC', 'Chưa có trong dữ liệu', true],
+      ['Khóa nối với lô hàng', 'Roll No. + B/L No.']
+    ])}
+    <div class="tbl-wrap" style="border-top:none;margin-top:16px"><table class="data"><thead><tr>
+      <th>Vận đơn (B/L)</th><th>Hồ sơ DDS</th><th>Nhà cung cấp</th><th>Nhà máy giấy</th>
+      <th>Nhà máy bột giấy</th><th class="num">Số cuộn/lô</th></tr></thead>
+      <tbody>${bls.map(bl => {
+        const rs = rolls.filter(x => x.bl === bl);
+        const d = ddsOf(rs[0].dds); const l = d ? d.lines[0] : null;
+        return `<tr class="sim-row">
+          <td><span class="code">${esc(bl)}</span></td>
+          <td><a class="code code-lnk" href="${keep({ dds: rs[0].dds })}">${esc(rs[0].dds)}</a></td>
+          <td>${esc(rs[0].supplier)}</td>
+          <td>${l ? esc(l.mill.name) + '<div class="cell-sub">' + esc(l.mill.country) + '</div>' : '—'}</td>
+          <td>${l ? esc(l.pulp.pulp_supplier) + '<div class="cell-sub">' + esc(l.pulp.pulp_type) + '</div>' : '—'}</td>
+          <td class="num">${rs.length}</td></tr>`;
+      }).join('')}</tbody></table></div>
+    ${accordion('Chuỗi thượng nguồn đầy đủ của từng hồ sơ DDS', 'nhà bán hàng → nhà máy giấy → bột giấy → rừng',
+      `<div style="border:1px solid var(--line);border-top:none;padding:16px 16px 4px">
+        ${ddsCodes.map(c => { const d = ddsOf(c); return d ? ddsChainHtml(d) : ''; }).join('')}</div>`)}
+  </div>`;
+}
+
+/* ── 03 · Nguyên liệu nhập kho ──────────────────────────────── */
+function secMaterial(rec) {
+  const rmRows = LEDGER.filter(r => rec.rmItems.includes(r.item) && r.type !== 'Consumption'
+    && ['WH_RW', 'WH_PLAN', 'WH_PROD', 'INTRANSIT'].includes(r.loc));
+  if (!rec.rolls.length) {
+    return `<div class="section" id="sec3">
+      <div class="sec-head"><span class="sec-num">03</span><h2>Nguyên liệu nhập kho</h2>${eudrTag('9(1)(a)(b)', 'mô tả & khối lượng')}</div>
+      <div class="tbl-wrap" style="border-top:1px solid var(--line)"><table class="data">
+        <thead><tr><th>Mã nguyên liệu</th><th>Mô tả</th><th class="num">Tiêu hao</th>
+          <th>Chứng nhận</th><th>Truy ngược lên phiếu nhập</th></tr></thead>
+        <tbody>${rec.rmItems.map(it => {
+          const cRows = rec.consumption.filter(r => r.item === it);
+          const all = LEDGER.filter(r => r.item === it && r.type !== 'Consumption');
+          const pur = all.filter(r => r.type === 'Purchase');
+          const cert = (LEDGER.find(r => r.item === it && r.cert) || {}).cert || '';
+          const st = pur.length ? `<span class="chip pefc">Có ${pur.length} phiếu nhập</span>`
+            : all.length ? `<span class="chip logic">Chỉ có ${all.length} bút toán điều chuyển</span>`
+            : '<span class="chip gap">Không tìm thấy phiếu nhập</span>';
+          return `<tr><td><a class="code code-lnk" href="${keep({ item: it })}">${esc(it)}</a></td>
+            <td style="max-width:340px">${dash(cRows[0].desc)}</td>
+            <td class="num">${fmt(cRows.reduce((s, r) => s + Math.abs(num(r.qty) || 0), 0))}</td>
+            <td>${certChip(cert)}</td><td>${st}</td></tr>`;
+        }).join('')}</tbody></table></div>
+      <div class="callout" style="margin-top:16px">Không có Roll No. nên chỉ truy ngược được tới <b>mã nguyên liệu</b>,
+        không xác định được đúng cuộn giấy vật lý đã dùng — đây là điểm EUDR và audit BRCGS sẽ hỏi trước tiên.</div>
+    </div>`;
+  }
+  return `<div class="section" id="sec3">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Nguyên liệu nhập kho</h2>${eudrTag('9(1)(a)(b)', 'mô tả & khối lượng')}</div>
+    ${sgrid([
+      ['Cuộn / lô định danh', rec.rolls.length + ' đơn vị'],
+      ['Khối lượng nhập', fmt(rec.rolls.reduce((s, r) => s + r.qty, 0))],
+      ['Đưa vào sản xuất', fmt(rec.rolls.reduce((s, r) => s + r.used, 0))],
+      ['Mã nguyên liệu', rec.rmItems.length + ' mã'],
+      ['Tỷ lệ có chứng nhận', Math.round(rec.rolls.filter(r => r.cert).length / rec.rolls.length * 100) + '% cuộn có chứng nhận rừng'],
+      ['Đường đi trong kho', 'WH_RW → WH_PLAN → WH_PROD']
+    ])}
+    <div class="tbl-wrap" style="border-top:none;margin-top:16px"><table class="data"><thead><tr>
+      <th>Cuộn / lô</th><th>Mã nguyên liệu</th><th class="num">Tiêu hao / Nhập</th><th>Chứng nhận</th>
+      <th>B/L</th><th>DDS</th><th>Vị trí kho</th></tr></thead>
+      <tbody>${rec.rolls.map(r => `<tr class="sim-row">
+        <td><a class="code code-lnk" href="${keep({ roll: r.roll })}">${esc(r.roll)}</a></td>
+        <td><a class="code code-lnk" href="${keep({ item: r.item })}">${esc(r.item)}</a>
+          <div class="cell-sub" style="max-width:240px">${esc(r.desc)}</div></td>
+        <td class="num">${fmt(r.used)} / ${fmt(r.qty)} <span class="cell-sub">${esc(r.unit)}</span></td>
+        <td>${certChip(r.cert)}</td>
+        <td><span class="code">${esc(r.bl)}</span></td>
+        <td><a class="code code-lnk" href="${keep({ dds: r.dds })}">${esc(r.dds)}</a></td>
+        <td class="mono">${esc(r.bin)}</td></tr>`).join('')}</tbody></table></div>
+    ${accordion('Bút toán nhập kho và điều chuyển nguyên liệu', rmRows.length + ' dòng', ledgerTable(rmRows))}
+  </div>`;
+}
+
+/* ── 04 · Sản xuất và thành phẩm ────────────────────────────── */
+function secProduction(rec) {
+  const outQty = rec.output.reduce((s, r) => s + (num(r.qty) || 0), 0);
+  const consQty = rec.consumption.reduce((s, r) => s + Math.abs(num(r.qty) || 0), 0);
+  const qcRows = rec.rows.filter(r => r.loc === 'WH_QC' && r.type !== 'Sale');
+  const fgRows = rec.rows.filter(r => r.loc === 'WH_FG' && r.type !== 'Sale');
+  return `<div class="section" id="sec4">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Sản xuất và thành phẩm</h2>
+      ${eudrTag('9(1)(a)(b)', 'sản phẩm & khối lượng')}</div>
+    ${sgrid([
+      ['Lệnh sản xuất', `<span class="code">${esc(rec.prodOrders.join(', ') || '—')}</span>`],
+      ['Nguyên liệu tiêu hao', fmt(consQty)],
+      ['Sản lượng ghi nhận', fmt(outQty) + ' thùng'],
+      ['Mã thành phẩm', `<span class="code">${esc(rec.fgCodes.join(', '))}</span>`],
+      ['Mã HS xuất khẩu', 'Chưa có trong dữ liệu', true],
+      ['Khối lượng tịnh (kg)', 'Chưa có trong dữ liệu', true]
+    ])}
+    ${rec.lots.length ? `<div style="margin-top:16px">${cap('Lô thành phẩm', `${rec.lots.length} lô · kiểm định và lưu kho`, SIMTAG)}</div>
+      ${lotTable(rec.lots)}` : ''}
+    ${accordion('Nguyên liệu tiêu hao (Consumption)', `${rec.consumption.length} dòng · khóa Production Order + PO Code + Item-FG`,
+      ledgerTable(rec.consumption))}
+    ${accordion('Sản lượng ghi nhận (Output)', `${rec.output.length} dòng`, ledgerTable(rec.output))}
+    ${accordion('Điều chuyển sang kho QC và kho thành phẩm', `${qcRows.length + fgRows.length} dòng · lệnh PRO-QC và QC-FG`,
+      ledgerTable(qcRows.concat(fgRows)))}
+  </div>`;
+}
+
+/* ── 05 · Giao hàng ─────────────────────────────────────────── */
+function secDelivery(rec) {
+  const saleRows = rec.rows.filter(r => r.type === 'Sale');
+  if (!SHIP || !rec.isMain) {
+    return `<div class="section" id="sec5">
+      <div class="sec-head"><span class="sec-num">05</span><h2>Giao hàng cho khách</h2>${eudrTag('9(1)(f)', 'bên nhận hàng')}</div>
+      <div class="callout">Không có bút toán Sales Shipment gắn đơn hàng này trong dữ liệu — chuỗi dừng ở kho thành phẩm,
+        chưa xác định được bên nhận hàng, một dữ liệu bắt buộc của EUDR.</div>
+    </div>`;
+  }
+  return `<div class="section" id="sec5">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Giao hàng cho khách</h2>${eudrTag('9(1)(f)', 'bên nhận hàng')}</div>
+    ${sgrid([
+      ['Chứng từ giao hàng', `<a class="code code-lnk" href="${keep({ ship: SHIP.doc })}">${esc(SHIP.doc)}</a>`],
+      ['Ngày giao', dmy(SHIP.date)],
+      ['Bên nhận hàng', esc(SHIP.customer)],
+      ['Thị trường đến', esc(SHIP.customer_country)],
+      ['Số lượng giao', fmt(SHIP.qty) + ' thùng · ' + SHIP.lots.length + ' lô'],
+      ['Container / hóa đơn', `<span class="mono">${esc(SHIP.container)}</span><div class="cell-sub">${esc(SHIP.invoice)}</div>`]
+    ])}
+    ${accordion('Bút toán xuất bán theo từng lô', `${saleRows.length} dòng`, ledgerTable(saleRows))}
+  </div>`;
+}
+
+/* ── 06 · Đánh giá tuân thủ EUDR ────────────────────────────── */
+function secCompliance(points) {
+  const okN = points.filter(p => p.ok).length;
+  const partN = points.filter(p => !p.ok && p.partial).length;
+  return `<div class="section" id="sec6">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Đánh giá tuân thủ EUDR</h2>
+      <span class="note">${okN} đủ · ${partN} thiếu một phần · ${points.length - okN - partN} chưa có</span></div>
+    <div class="check-grid">${points.map(p => {
+      const cls = p.ok ? '' : p.partial ? 'partial' : 'fail';
+      const mark = p.ok ? '✓' : p.partial ? '~' : '✕';
+      return `<div class="check ${cls}"><span class="mark">${mark}</span>
+        <div><div class="t">${esc(p.t)} <span class="eudr" style="margin-left:4px">${esc(p.art)}</span></div>
+          <div class="s">${p.s}</div></div></div>`;
+    }).join('')}</div>
+    <div class="callout info" style="margin-top:16px">Chứng nhận PEFC/FSC được EUDR xem là <b>thông tin bổ trợ cho đánh giá rủi ro</b>,
+      không thay thế nghĩa vụ thẩm định của doanh nghiệp. Hồ sơ vẫn cần tọa độ vùng trồng, bằng chứng hợp pháp
+      và khối lượng theo đơn vị quy định thì mới đủ để lập tuyên bố thẩm định.</div>
+  </div>`;
+}
+
+/* ── Trang hồ sơ ────────────────────────────────────────────── */
 function renderPo(po) {
   const rec = buildPo(po);
   if (!rec) return renderNotFound(po, 'đơn hàng khách');
   window.__REC = rec;
   const outQty = rec.output.reduce((s, r) => s + (num(r.qty) || 0), 0);
-  const consQty = rec.consumption.reduce((s, r) => s + Math.abs(num(r.qty) || 0), 0);
-  const gaps = rec.stages.filter(s => !s.rows.length).length;
   const fgName = (rec.output[0] || rec.rows[0]).desc;
   const ddsCodes = uniq(rec.rolls.map(r => r.dds));
   const forests = [];
   ddsCodes.forEach(c => { const d = ddsOf(c); if (d) forestsOfDds(d).forEach(x => forests.push(x)); });
   window.__FORESTS = forests;
+  window.__DIR = window.__DIR || 'down';
+  accSeq = 0;
+  const points = eudrPoints(rec, forests, ddsCodes);
+  const okN = points.filter(p => p.ok).length;
 
   $('recordBody').innerHTML = `
-  <div class="crumb"><a href="${keep({})}">Tra cứu</a> · Hồ sơ đơn hàng khách</div>
-  ${SIM_ON ? '' : `<div class="callout" style="margin-bottom:18px">Đang xem <b>dữ liệu NAV hiện tại</b> — chuỗi còn đứt ở ${gaps} mắt xích.
+  <div class="crumb"><a href="${keep({})}">Tra cứu</a> · Hồ sơ truy xuất đơn hàng</div>
+  ${SIM_ON ? '' : `<div class="callout" style="margin-bottom:18px">Đang xem <b>dữ liệu NAV hiện tại</b> — chuỗi còn đứt.
     <a class="code-lnk" href="?po=${encodeURIComponent(po)}">Bật lớp dữ liệu bổ sung &rsaquo;</a></div>`}
 
   <div class="hero">
@@ -468,67 +808,28 @@ function renderPo(po) {
       <div class="sub">${esc(fgName)} · Mã thành phẩm <span class="code">${esc(rec.fgCodes.join(', '))}</span></div>
       <div class="sub" style="margin-top:8px;color:var(--ink-3)">
         Lệnh sản xuất <span class="code">${esc(rec.prodOrders.join(', ') || '—')}</span>
-        ${SHIP && rec.isMain ? ` · Giao hàng <a class="code code-lnk" href="${keep({ ship: SHIP.doc })}">${esc(SHIP.doc)}</a> · ${esc(SHIP.customer)}` : ''}
+        ${SHIP && rec.isMain ? ` · Giao cho ${esc(SHIP.customer)} ngày ${dmy(SHIP.date)}` : ''}
       </div>
     </div>
     <div class="hero-right"><div><div class="qr-box" id="qrBox"></div><div class="qr-cap">Quét để mở<br>hồ sơ này</div></div></div>
   </div>
 
   <div class="stat-strip">
-    <div class="st"><div class="num mono">${fmt(outQty)}</div><div class="lbl">Sản lượng Output</div></div>
-    <div class="st"><div class="num mono">${fmt(consQty)}</div><div class="lbl">Nguyên liệu tiêu hao</div></div>
+    <div class="st"><div class="num mono">${fmt(outQty)}</div><div class="lbl">Thùng thành phẩm</div></div>
     <div class="st"><div class="num mono">${rec.isMain ? rec.rolls.length : rec.rmItems.length}</div>
       <div class="lbl">${rec.isMain ? 'Cuộn / lô nguyên liệu' : 'Mã nguyên liệu'}</div></div>
-    <div class="st ${gaps ? 'warn' : 'ok'}"><div class="num mono">${gaps ? gaps : forests.length}</div>
-      <div class="lbl">${gaps ? 'Mắt xích thiếu dữ liệu' : 'Khu rừng truy được'}</div></div>
+    <div class="st ${forests.length ? 'ok' : 'warn'}"><div class="num mono">${forests.length}</div><div class="lbl">Khu rừng truy được</div></div>
+    <div class="st ${okN >= 7 ? 'ok' : 'warn'}"><div class="num mono">${okN}/${points.length}</div><div class="lbl">Điểm dữ liệu EUDR đủ</div></div>
   </div>
 
-  <div class="section">
-    <div class="sec-head"><span class="sec-num">01</span><h2>Chuỗi hành trình sản phẩm</h2>
-      <span class="note">Bấm vào từng mắt xích để xem bút toán gốc</span></div>
-    <div class="tape">
-      ${rec.stages.map((s, i) => {
-        const lk = rec.links[i]; const last = i === rec.stages.length - 1;
-        const cls = [s.rows.length ? '' : 'empty', last ? 'last' : (lk ? lk.type : '')].join(' ');
-        const key = last ? '' : `<div class="vkey">↓ nối sang ${esc(rec.stages[i + 1].code)} bằng <b>${esc(lk.key)}</b>${
-          lk.type === 'logic' ? ' · liên kết logic' : lk.type === 'missing' ? ' · chưa có dữ liệu' : ''}</div>`;
-        return `<div class="vrow ${cls}" data-stage="${s.id}">
-          <div class="vrail"><span class="vdot"></span><span class="vline"></span></div>
-          <div class="vbody"><div class="vhead"><span class="v-code">${esc(s.code)}</span>
-            <span class="v-name">${esc(s.name)}</span>
-            <span class="v-count">${s.rows.length ? s.rows.length + ' bút toán' : 'thiếu dữ liệu'}</span>
-            ${s.rows.length && s.rows.every(r => r.sim) ? SIMTAG : ''}</div>${key}</div></div>`;
-      }).join('')}
-      <div class="legend">
-        <span><i></i> Nối trực tiếp bằng khóa dữ liệu</span>
-        <span><i class="logic"></i> Nối theo logic (chưa có khóa duy nhất)</span>
-        <span><i class="missing"></i> Thiếu dữ liệu trong NAV</span>
-      </div>
-    </div>
-    <div id="stageDetail" style="margin-top:16px"></div>
-  </div>
+  <div style="margin-top:26px" id="chainWrap">${chainOverview(rec, forests)}</div>
 
-  ${rec.isMain ? twoWaySection(rec, forests) : ''}
-
-  <div class="section">
-    <div class="sec-head"><span class="sec-num">${rec.isMain ? '03' : '02'}</span><h2>Lệnh sản xuất · tiêu hao và sản lượng</h2>
-      <span class="note">${esc(rec.prodOrders.join(', '))}</span></div>
-    ${cap('Nguyên liệu tiêu hao (Consumption)',
-      `${rec.consumption.length} dòng · ${rec.rmItems.length} mã nguyên liệu · gắn Item-FG ${esc(rec.fgCodes.join(', '))}`,
-      `<span class="chip ink">Khóa: Production Order + PO Code + Item-FG</span>`)}
-    ${ledgerTable(rec.consumption)}
-    ${cap('Thành phẩm nhập kho sản xuất (Output)', `${rec.output.length} lần ghi nhận · tổng ${fmt(outQty)}`, '')}
-    ${ledgerTable(rec.output)}
-  </div>
-
-  ${rec.isMain ? rollSection(rec) : itemSection(rec)}
-  ${rec.isMain ? shipSection() : ''}
-  ${ddsSection(rec, ddsCodes)}
-
-  <div class="section">
-    <div class="sec-head"><span class="sec-num">${rec.isMain ? '07' : '05'}</span><h2>Xác thực dữ liệu</h2></div>
-    ${checks(rec)}
-  </div>
+  ${secForest(rec, forests)}
+  ${secSupplier(rec, ddsCodes)}
+  ${secMaterial(rec)}
+  ${secProduction(rec)}
+  ${secDelivery(rec)}
+  ${secCompliance(points)}
 
   <div class="footer">
     <div><div class="t">Hồ sơ truy xuất nguồn gốc · ${esc(PRODUCER.name)}</div>
@@ -538,139 +839,12 @@ function renderPo(po) {
   </div>`;
 
   document.title = rec.po + ' · Truy xuất nguồn gốc Go-Pak';
-  document.querySelectorAll('.vrow').forEach(n => n.addEventListener('click', () => showStage(n.getAttribute('data-stage'))));
-  showStage('sale');
   renderQr(location.origin + location.pathname + keep({ po: rec.po }));
   initMap();
 }
 
-function showStage(id) {
-  const rec = window.__REC;
-  const st = rec.stages.find(s => s.id === id);
-  document.querySelectorAll('.vrow').forEach(n => n.classList.toggle('active', n.getAttribute('data-stage') === id));
-  const notes = {
-    purchase: 'Phiếu nhập mua của các nguyên liệu đã tiêu hao cho đơn hàng này.',
-    wh_rw: 'Biến động tại kho nguyên liệu, gắn Roll No. và B/L của lô nhập.',
-    wh_plan: 'Nguyên liệu tại kho kế hoạch, điều chuyển theo lệnh RW-PLAN / PLAN-PRO.',
-    wh_prod_rm: 'Nguyên liệu đã vào kho sản xuất, sẵn sàng tiêu hao theo lệnh.',
-    prod: 'Tiêu hao nguyên liệu và ghi nhận sản lượng theo lệnh sản xuất.',
-    wh_qc: 'Thành phẩm nhập kho QC theo lệnh PRO-QC.',
-    wh_fg: 'Thành phẩm nhập kho thành phẩm theo lệnh QC-FG.',
-    sale: 'Bút toán xuất bán gắn PO khách hàng — điểm kết thúc của chuỗi.'
-  };
-  $('stageDetail').innerHTML =
-    cap(`${esc(st.code)} · ${esc(st.name)}`, esc(notes[id] || ''),
-      `<span class="chip ${st.rows.length ? 'ink' : 'gap'}">${st.rows.length} bút toán</span>`) +
-    (st.rows.length ? ledgerTable(st.rows)
-      : `<div class="callout" style="border-top:none">Không có bút toán nào cho mắt xích <b>${esc(st.code)}</b> trong dữ liệu hiện có — chuỗi đứt tại đây.</div>`);
-}
-
-/* ── Truy xuôi / truy ngược ─────────────────────────────────── */
-function twoWaySection(rec, forests) {
-  const ddsCodes = uniq(rec.rolls.map(r => r.dds));
-  return `<div class="section">
-    <div class="sec-head"><span class="sec-num">02</span><h2>Truy xuất hai chiều</h2>
-      <span class="note">Bấm vào bất kỳ mã nào để đi tiếp theo hướng đó</span></div>
-    <div class="grid-2">
-      <div class="card card-pad">
-        <div class="way-head"><span class="way-tag back">Truy ngược</span> Ly giấy → khu rừng</div>
-        <div class="way-line"><span class="way-step">Giao hàng</span>
-          <a class="code code-lnk" href="${keep({ ship: SHIP.doc })}">${esc(SHIP.doc)}</a> · ${esc(SHIP.customer)}</div>
-        <div class="way-line"><span class="way-step">Lô thành phẩm</span>
-          ${rec.lots.slice(0, 3).map(l => `<a class="code code-lnk" href="${keep({ lot: l.lot })}">${esc(l.lot)}</a>`).join(' ')}
-          <span style="color:var(--ink-3)">+${rec.lots.length - 3} lô</span></div>
-        <div class="way-line"><span class="way-step">Lệnh sản xuất</span>
-          <span class="code">${esc(rec.prodOrders.join(', '))}</span></div>
-        <div class="way-line"><span class="way-step">Cuộn nguyên liệu</span>
-          ${rec.rolls.slice(0, 3).map(r => `<a class="code code-lnk" href="${keep({ roll: r.roll })}">${esc(r.roll)}</a>`).join(' ')}
-          <span style="color:var(--ink-3)">+${rec.rolls.length - 3} cuộn</span></div>
-        <div class="way-line"><span class="way-step">Hồ sơ DDS</span>
-          ${ddsCodes.map(c => `<a class="code code-lnk" href="${keep({ dds: c })}">${esc(c)}</a>`).join(' ')}</div>
-        <div class="way-line last"><span class="way-step">Khu rừng</span>
-          ${uniq(forests.map(x => x.f.owner)).map(o => esc(o)).join(' · ') || '—'}</div>
-      </div>
-      <div class="card card-pad">
-        <div class="way-head"><span class="way-tag fwd">Truy xuôi</span> Khu rừng → khách hàng</div>
-        <div class="way-line"><span class="way-step">Khu rừng</span>
-          ${uniq(forests.map(x => x.f.country)).map(c => esc(c)).join(' · ')} · ${forests.length} khu rừng</div>
-        <div class="way-line"><span class="way-step">B/L nhập khẩu</span>
-          ${uniq(rec.rolls.map(r => r.bl)).map(b => `<span class="code">${esc(b)}</span>`).join(' ')}</div>
-        <div class="way-line"><span class="way-step">Nhập kho NVL</span>
-          ${rec.rolls.length} cuộn/lô · ${fmt(rec.rolls.reduce((s, r) => s + r.qty, 0))} đơn vị</div>
-        <div class="way-line"><span class="way-step">Tiêu hao SX</span>
-          ${fmt(rec.rolls.reduce((s, r) => s + r.used, 0))} đơn vị vào lệnh ${esc(rec.prodOrders[0] || '')}</div>
-        <div class="way-line"><span class="way-step">Thành phẩm</span>
-          ${rec.lots.length} lô · ${fmt(rec.lots.reduce((s, l) => s + l.qty, 0))} thùng ${esc(rec.fgCodes[0])}</div>
-        <div class="way-line last"><span class="way-step">Khách hàng</span>
-          ${esc(SHIP.customer)} · ${esc(SHIP.customer_country)} ${SIMTAG}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function rollSection(rec) {
-  return `<div class="section">
-    <div class="sec-head"><span class="sec-num">04</span><h2>Cuộn / lô nguyên liệu đã dùng</h2>
-      <span class="note">${rec.rolls.length} cuộn từ ${uniq(rec.rolls.map(r => r.bl)).length} lô nhập khẩu</span></div>
-    <div class="tbl-wrap" style="border-top:1px solid var(--line)"><table class="data"><thead><tr>
-      <th>Cuộn / lô</th><th>Mã nguyên liệu</th><th class="num">Tiêu hao / Nhập</th><th>Chứng nhận</th>
-      <th>B/L nhập khẩu</th><th>Hồ sơ DDS</th><th>Nhà cung cấp</th><th>Vị trí kho</th></tr></thead>
-      <tbody>${rec.rolls.map(r => `<tr class="sim-row">
-        <td><a class="code code-lnk" href="${keep({ roll: r.roll })}">${esc(r.roll)}</a></td>
-        <td><a class="code code-lnk" href="${keep({ item: r.item })}">${esc(r.item)}</a>
-          <div class="cell-sub" style="max-width:250px">${esc(r.desc)}</div></td>
-        <td class="num">${fmt(r.used)} / ${fmt(r.qty)} <span class="cell-sub">${esc(r.unit)}</span></td>
-        <td>${certChip(r.cert)}</td>
-        <td><span class="code">${esc(r.bl)}</span></td>
-        <td><a class="code code-lnk" href="${keep({ dds: r.dds })}">${esc(r.dds)}</a></td>
-        <td>${esc(r.supplier)}</td>
-        <td class="mono">${esc(r.bin)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="callout info" style="margin-top:16px">Toàn bộ Roll No., B/L No. và mã DDS ở bảng này là <b>dữ liệu mô phỏng</b>
-      — minh họa đúng 3 trường cần bổ sung vào phiếu nhập kho NAV. Có 3 trường này thì chuỗi chạy được cả hai chiều
-      mà không phải đổi cách vận hành hiện tại.</div>
-  </div>`;
-}
-
-function itemSection(rec) {
-  return `<div class="section">
-    <div class="sec-head"><span class="sec-num">03</span><h2>Nguyên liệu và khả năng truy ngược</h2></div>
-    <div class="tbl-wrap" style="border-top:1px solid var(--line)"><table class="data">
-      <thead><tr><th>Mã nguyên liệu</th><th>Mô tả</th><th class="num">Tiêu hao</th>
-        <th>Chứng nhận</th><th>Truy ngược lên phiếu nhập</th></tr></thead>
-      <tbody>${rec.rmItems.map(it => {
-        const cRows = rec.consumption.filter(r => r.item === it);
-        const all = LEDGER.filter(r => r.item === it && r.type !== 'Consumption');
-        const pur = all.filter(r => r.type === 'Purchase');
-        const cert = (LEDGER.find(r => r.item === it && r.cert) || {}).cert || '';
-        const st = pur.length ? `<span class="chip pefc">Có ${pur.length} phiếu nhập</span>`
-          : all.length ? `<span class="chip logic">Chỉ có ${all.length} bút toán điều chuyển</span>`
-          : '<span class="chip gap">Không tìm thấy phiếu nhập</span>';
-        return `<tr><td><a class="code code-lnk" href="${keep({ item: it })}">${esc(it)}</a></td>
-          <td style="max-width:340px">${dash(cRows[0].desc)}</td>
-          <td class="num">${fmt(cRows.reduce((s, r) => s + Math.abs(num(r.qty) || 0), 0))}</td>
-          <td>${certChip(cert)}</td><td>${st}</td></tr>`;
-      }).join('')}</tbody></table></div>
-  </div>`;
-}
-
-function shipSection() {
-  return `<div class="section">
-    <div class="sec-head"><span class="sec-num">05</span><h2>Giao hàng cho khách</h2><span class="note">${SIMTAG}</span></div>
-    <div class="card card-pad grid-3">
-      <div class="field"><div class="lbl">Số chứng từ giao hàng</div>
-        <div class="val"><a class="code code-lnk" href="${keep({ ship: SHIP.doc })}">${esc(SHIP.doc)}</a></div></div>
-      <div class="field"><div class="lbl">Ngày giao</div><div class="val mono">${dmy(SHIP.date)}</div></div>
-      <div class="field"><div class="lbl">Khách hàng</div><div class="val">${esc(SHIP.customer)}</div></div>
-      <div class="field"><div class="lbl">Hóa đơn xuất khẩu</div><div class="val mono">${esc(SHIP.invoice)}</div></div>
-      <div class="field"><div class="lbl">Container</div><div class="val mono">${esc(SHIP.container)}</div></div>
-      <div class="field"><div class="lbl">Cảng đi → cảng đến</div><div class="val">${esc(SHIP.port_load)} → ${esc(SHIP.port_discharge)}</div></div>
-    </div>
-    ${lotTable(LOTS)}
-  </div>`;
-}
-
 function lotTable(lots) {
-  return `<div class="tbl-wrap" style="border-top:none;margin-top:16px"><table class="data"><thead><tr>
+  return `<div class="tbl-wrap" style="border-top:none"><table class="data"><thead><tr>
     <th>Lô thành phẩm</th><th>Mã FG</th><th class="num">Số lượng</th><th>Lệnh sản xuất</th>
     <th>Kiểm định</th><th>Vị trí kho FG</th><th>Giao hàng</th></tr></thead>
     <tbody>${lots.map(l => `<tr class="sim-row">
@@ -684,7 +858,6 @@ function lotTable(lots) {
     </tbody></table></div>`;
 }
 
-/* ── DDS ────────────────────────────────────────────────────── */
 function ddsChainHtml(d) {
   return d.lines.map(l => `
     <div class="dds-chain" style="margin-bottom:14px">
@@ -699,57 +872,6 @@ function ddsChainHtml(d) {
         <div class="m">${l.forests.map(f => esc(f.country)).join(' · ')} · ${l.forests.length} nguồn<br>
           <a class="code-lnk" href="${keep({ dds: d.doc_no || d.po_number })}">Xem hồ sơ DDS &rsaquo;</a></div></div>
     </div>`).join('');
-}
-
-function ddsSection(rec, ddsCodes) {
-  const n = rec.isMain ? '06' : '04';
-  if (!ddsCodes.length) {
-    const ref = DDS_LIST[0];
-    return `<div class="section">
-      <div class="sec-head"><span class="sec-num">${n}</span><h2>Hồ sơ DDS nhà cung cấp</h2>
-        <span class="note">Chưa nối được với đơn hàng này</span></div>
-      <div class="callout">Không ghép được hồ sơ DDS cho ${rec.rmItems.length} mã nguyên liệu của đơn hàng này:
-        biểu mẫu DDS lập theo đơn mua của nhà cung cấp, còn NAV ghi theo Item No., không có trường nối chung.</div>
-      ${cap('Hồ sơ DDS đang có trong hệ thống', esc(ref.material_name.split('/')[0].trim()),
-        `<a class="chip ink" href="${keep({ dds: ref.po_number })}">Xem đầy đủ &rsaquo;</a>`)}
-      <div style="border:1px solid var(--line);border-top:none;padding:16px 16px 4px">${ddsChainHtml(ref)}</div>
-    </div>`;
-  }
-  return `<div class="section">
-    <div class="sec-head"><span class="sec-num">${n}</span><h2>Hồ sơ DDS và khu rừng nguồn gốc</h2>
-      <span class="note">${ddsCodes.length} hồ sơ · nối bằng Roll No. + B/L No.</span></div>
-    ${ddsCodes.map(c => { const d = ddsOf(c); return d ? ddsChainHtml(d) : ''; }).join('')}
-    <div class="card" style="margin-top:4px">
-      <div class="map-note">Vị trí khu rừng ở cấp vùng trồng (mô phỏng). Với dữ liệu thật, mỗi khu rừng gắn file GeoJSON
-        do nhà cung cấp gửi kèm hồ sơ DDS.</div>
-      <div id="map"></div>
-    </div>
-  </div>`;
-}
-
-function checks(rec) {
-  const has = id => rec.stages.find(s => s.id === id).rows.length;
-  const items = SIM_ON && rec.isMain ? [
-    { ok: 1, t: 'Thành phẩm ↔ lệnh sản xuất', s: `Nối qua ${esc(rec.prodOrders.join(', '))} và Item-FG ${esc(rec.fgCodes.join(', '))}.` },
-    { ok: 1, t: 'Nguyên liệu ↔ cuộn giấy vật lý', s: `${rec.rolls.length} cuộn/lô có Roll No. riêng, truy được về đúng B/L. ${SIMTAG}` },
-    { ok: 1, t: 'Cuộn giấy ↔ hồ sơ DDS', s: `${uniq(rec.rolls.map(r => r.dds)).length} hồ sơ DDS nối trực tiếp qua B/L No. ${SIMTAG}` },
-    { ok: 1, t: 'Hồ sơ DDS ↔ khu rừng', s: 'Mỗi hồ sơ có chủ rừng, loài cây, kỳ khai thác và tọa độ.' },
-    { ok: 1, t: 'Thành phẩm ↔ lô FG ↔ kho', s: `${rec.lots.length} lô thành phẩm có mã riêng, kiểm định đạt, có vị trí kho. ${SIMTAG}` },
-    { ok: 1, t: 'Lô FG ↔ giao hàng ↔ khách', s: `Chứng từ ${esc(SHIP.doc)} gắn PO khách và toàn bộ lô. ${SIMTAG}` }
-  ] : [
-    { ok: rec.prodOrders.length, t: 'Thành phẩm ↔ lệnh sản xuất', s: `Nối qua ${esc(rec.prodOrders.join(', ') || '—')}.` },
-    { ok: 1, t: 'Đơn hàng khách ↔ thành phẩm', s: `${rec.rows.length} bút toán mang Po_no Code ${esc(rec.po)}.` },
-    { ok: rec.consumption.length, t: 'Lệnh sản xuất ↔ nguyên liệu tiêu hao', s: `${rec.consumption.length} dòng Consumption.` },
-    { ok: has('wh_qc') && has('wh_fg'), t: 'Thành phẩm ↔ kho QC ↔ kho FG', s: 'Nối qua lệnh PRO-QC và QC-FG cùng PO Code.' },
-    { state: 'fail', t: 'Nguyên liệu ↔ cuộn giấy vật lý', s: 'Ledger không có Roll No. / B/L No.' },
-    { state: 'fail', t: 'Thành phẩm ↔ giao hàng cho khách', s: 'Không có bút toán Sales Shipment gắn PO.' }
-  ];
-  return `<div class="check-grid">${items.map(i => {
-    const cls = i.state === 'fail' ? 'fail' : i.state === 'partial' ? 'partial' : (i.ok ? '' : 'fail');
-    const mark = cls === 'fail' ? '✕' : cls === 'partial' ? '~' : '✓';
-    return `<div class="check ${cls}"><span class="mark">${mark}</span>
-      <div><div class="t">${esc(i.t)}</div><div class="s">${i.s}</div></div></div>`;
-  }).join('')}</div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════
