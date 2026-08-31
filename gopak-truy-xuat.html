@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go-Pak · Cổng truy xuất nguồn gốc EUDR</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   Bảng màu lấy từ chính vật tư của Go-Pak (danh mục mực in trong NAV):
+   Ink Black K1020, Ink Red 185C, Ink Magenta R3121A, Ink Super White 0418W
+   → đen mực = nền chữ, đỏ 185C = thiếu dữ liệu, magenta = liên kết logic,
+     xanh rừng = đã có chứng nhận, nâu kraft = nhấn cấu trúc.
+   ═══════════════════════════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --paper:#f4f1ea; --card:#ffffff; --card-2:#faf8f4;
+  --ink:#101418; --ink-2:#3b454f; --ink-3:#77828d;
+  --line:#e2ddd2; --line-2:#eeeae1;
+  --kraft:#8a6a3f; --kraft-soft:#f3ecdf;
+  --red:#e4002b; --red-soft:#fdeaed;
+  --magenta:#c6168d; --magenta-soft:#fbe9f4;
+  --forest:#1f6b45; --forest-soft:#e4f0e9;
+  --radius:4px;
+}
+html,body{height:100%;}
+body{
+  font-family:"Inter","Segoe UI",Roboto,sans-serif;
+  color:var(--ink); background:var(--paper);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none;}
+h1,h2,h3,.display{font-family:"Archivo","Inter",sans-serif;letter-spacing:-0.015em;}
+.mono{font-family:"IBM Plex Mono",Consolas,monospace;}
+
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── Thanh trên ─────────────────────────────────────────────── */
+.topbar{
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
+  padding:12px 26px;background:var(--ink);color:#fff;flex-wrap:wrap;
+}
+.topbar .brand{display:flex;align-items:center;gap:12px;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;}
+.topbar .brand b{font-family:"Archivo";font-size:15px;letter-spacing:.06em;}
+.topbar .brand .sep{width:1px;height:16px;background:rgba(255,255,255,.25);}
+.topbar .tools{display:flex;align-items:center;gap:8px;}
+.mini-search{display:flex;align-items:center;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);border-radius:var(--radius);}
+.mini-search input{background:transparent;border:none;outline:none;color:#fff;font-size:12.5px;padding:7px 10px;width:210px;font-family:"IBM Plex Mono",monospace;}
+.mini-search input::placeholder{color:rgba(255,255,255,.45);}
+.mini-search button{background:transparent;border:none;border-left:1px solid rgba(255,255,255,.16);color:#fff;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;}
+.mini-search button:hover{background:rgba(255,255,255,.12);}
+.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,.22);color:#fff;padding:7px 12px;border-radius:var(--radius);font-size:12.5px;font-weight:600;cursor:pointer;}
+.btn-ghost:hover{background:rgba(255,255,255,.1);}
+
+.wrap{max-width:1160px;margin:0 auto;padding:26px 22px 70px;}
+
+/* ── Trang tra cứu ──────────────────────────────────────────── */
+#page-search{background:var(--ink);color:#fff;min-height:100vh;display:none;}
+#page-search.active{display:flex;align-items:center;justify-content:center;}
+#page-search .search-inner{width:100%;max-width:880px;padding:56px 24px;}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--kraft);}
+#page-search .eyebrow{color:#c9a86f;}
+#page-search h1{font-size:clamp(34px,6vw,62px);line-height:.98;font-weight:800;margin:16px 0 14px;text-transform:uppercase;}
+#page-search h1 em{font-style:normal;color:#c9a86f;}
+#page-search .lede{font-size:15px;color:rgba(255,255,255,.62);max-width:620px;line-height:1.6;}
+.mode-row{display:flex;gap:0;margin:32px 0 0;flex-wrap:wrap;border:1px solid rgba(255,255,255,.18);border-radius:var(--radius);overflow:hidden;width:fit-content;}
+.mode-btn{background:transparent;border:none;border-right:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.7);
+  font-size:12.5px;font-weight:600;padding:10px 18px;cursor:pointer;font-family:"Inter";}
+.mode-btn:last-child{border-right:none;}
+.mode-btn.active{background:#fff;color:var(--ink);}
+.mode-btn:hover:not(.active){background:rgba(255,255,255,.08);color:#fff;}
+.search-bar{display:flex;margin-top:14px;background:#fff;border-radius:var(--radius);overflow:hidden;max-width:620px;}
+.search-bar input{flex:1;border:none;outline:none;padding:16px 18px;font-size:16px;font-family:"IBM Plex Mono",monospace;color:var(--ink);}
+.search-bar button{background:var(--red);color:#fff;border:none;padding:0 30px;font-size:14px;font-weight:700;cursor:pointer;font-family:"Archivo";letter-spacing:.04em;}
+.search-bar button:hover{background:#c30025;}
+.hint{margin-top:14px;font-size:12.5px;color:rgba(255,255,255,.5);}
+.hint b{color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:500;cursor:pointer;border-bottom:1px dotted rgba(255,255,255,.4);}
+.hint b:hover{color:#c9a86f;}
+.search-foot{margin-top:44px;padding-top:20px;border-top:1px solid rgba(255,255,255,.14);display:flex;gap:40px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,.45);}
+.search-foot div b{display:block;color:#fff;font-size:13px;font-weight:600;margin-bottom:3px;font-family:"Archivo";}
+
+/* ── Hero hồ sơ ─────────────────────────────────────────────── */
+.hero{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ink);padding:26px 28px;display:flex;justify-content:space-between;gap:26px;flex-wrap:wrap;}
+.hero h1{font-size:30px;font-weight:800;line-height:1.1;margin:10px 0 6px;}
+.hero .sub{font-size:13.5px;color:var(--ink-2);}
+.hero-right{display:flex;gap:18px;align-items:flex-start;}
+.qr-box{background:#fff;border:1px solid var(--line);padding:7px;line-height:0;}
+.qr-cap{font-size:10px;color:var(--ink-3);text-align:center;margin-top:5px;line-height:1.3;}
+.stat-strip{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:none;background:var(--card);}
+.stat-strip .st{padding:16px 20px;border-right:1px solid var(--line);}
+.stat-strip .st:last-child{border-right:none;}
+.stat-strip .num{font-family:"Archivo";font-size:26px;font-weight:700;line-height:1;}
+.stat-strip .lbl{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.09em;margin-top:6px;}
+.stat-strip .st.warn .num{color:var(--red);}
+
+/* ── Khối section ───────────────────────────────────────────── */
+.section{margin-top:34px;}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+.sec-num{font-family:"IBM Plex Mono";font-size:11.5px;font-weight:600;color:var(--kraft);letter-spacing:.1em;}
+.sec-head h2{font-size:19px;font-weight:700;}
+.sec-head .note{font-size:12.5px;color:var(--ink-3);margin-left:auto;}
+.card{background:var(--card);border:1px solid var(--line);}
+.card-pad{padding:20px 22px;}
+
+/* ── Băng chuỗi hành trình (điểm nhấn của bản demo) ─────────── */
+.tape{background:var(--card);border:1px solid var(--line);}
+.vrow{display:flex;gap:18px;padding:0 24px;cursor:pointer;transition:background .12s;}
+.vrow:hover{background:var(--card-2);}
+.vrow.active{background:var(--card-2);}
+.vrail{flex:0 0 14px;display:flex;flex-direction:column;align-items:center;}
+.vdot{width:13px;height:13px;border-radius:50%;background:var(--ink);margin-top:20px;flex:0 0 auto;}
+.vrow.empty .vdot{background:#fff;border:2px solid var(--red);}
+.vrow.active .vdot{box-shadow:0 0 0 4px var(--card-2),0 0 0 6px var(--kraft);}
+.vline{width:2px;flex:1;background:var(--ink);margin-top:6px;}
+.vrow.logic .vline{background:repeating-linear-gradient(180deg,var(--magenta) 0 6px,transparent 6px 11px);}
+.vrow.missing .vline{background:repeating-linear-gradient(180deg,var(--red) 0 6px,transparent 6px 11px);}
+.vrow.last .vline{background:none;}
+.vbody{flex:1;padding:15px 0 17px;min-width:0;}
+.vhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.v-code{font-family:"IBM Plex Mono";font-size:13.5px;font-weight:600;}
+.vrow:hover .v-code{text-decoration:underline;}
+.v-name{font-size:12.5px;color:var(--ink-3);}
+.v-count{font-size:10.5px;font-family:"IBM Plex Mono";padding:2px 8px;border-radius:20px;
+  background:var(--card);border:1px solid var(--line);color:var(--ink-2);}
+.vrow.empty .v-count{background:var(--red-soft);border-color:#f6c6ce;color:var(--red);}
+.vkey{font-size:11.5px;color:var(--ink-3);margin-top:8px;font-family:"IBM Plex Mono";line-height:1.4;}
+.vkey b{font-weight:500;color:var(--ink-2);}
+.vrow.logic .vkey,.vrow.logic .vkey b{color:var(--magenta);}
+.vrow.missing .vkey,.vrow.missing .vkey b{color:var(--red);font-weight:600;}
+.legend{display:flex;gap:22px;flex-wrap:wrap;padding:14px 24px;font-size:11.5px;color:var(--ink-3);
+  border-top:1px solid var(--line-2);background:var(--card-2);}
+.legend span{display:inline-flex;align-items:center;gap:7px;}
+.legend i{width:26px;height:2px;display:inline-block;background:var(--ink);}
+.legend i.logic{background:repeating-linear-gradient(90deg,var(--magenta) 0 6px,transparent 6px 11px);}
+.legend i.missing{background:repeating-linear-gradient(90deg,var(--red) 0 6px,transparent 6px 11px);}
+
+/* ── Bảng ───────────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-top:none;}
+table.data{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.data thead th{
+  text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;padding:10px 14px;background:var(--card-2);border-bottom:1px solid var(--line);white-space:nowrap;
+}
+table.data td{padding:10px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;}
+table.data tbody tr:last-child td{border-bottom:none;}
+table.data tbody tr:hover td{background:var(--card-2);}
+table.data td.num,table.data th.num{text-align:right;font-family:"IBM Plex Mono";white-space:nowrap;}
+table.data td.neg{color:var(--red);}
+.code{font-family:"IBM Plex Mono";font-size:12px;font-weight:500;}
+.code-lnk{border-bottom:1px dotted var(--kraft);cursor:pointer;color:var(--kraft);}
+.code-lnk:hover{border-bottom-style:solid;}
+.empty-row{padding:22px;text-align:center;color:var(--ink-3);font-size:13px;background:var(--card);border:1px solid var(--line);border-top:none;}
+
+.chip{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:2px;letter-spacing:.02em;white-space:nowrap;}
+.chip.pefc{background:var(--forest-soft);color:var(--forest);}
+.chip.fsc{background:var(--kraft-soft);color:var(--kraft);}
+.chip.none{background:#f0eee9;color:var(--ink-3);}
+.chip.gap{background:var(--red-soft);color:var(--red);}
+.chip.logic{background:var(--magenta-soft);color:var(--magenta);}
+.chip.ink{background:var(--ink);color:#fff;}
+
+.tbl-cap{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--line);padding:12px 16px;}
+.tbl-cap .t{font-size:13px;font-weight:700;font-family:"Archivo";}
+.tbl-cap .s{font-size:11.5px;color:var(--ink-3);}
+
+/* ── Lưới kiểm tra dữ liệu ──────────────────────────────────── */
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0;border:1px solid var(--line);background:var(--card);}
+.check{padding:16px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;gap:12px;}
+.check .mark{width:20px;height:20px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:var(--forest);}
+.check.fail .mark{background:var(--red);}
+.check.partial .mark{background:var(--magenta);}
+.check .t{font-size:13px;font-weight:600;margin-bottom:3px;}
+.check .s{font-size:11.5px;color:var(--ink-3);line-height:1.45;}
+
+/* ── Chuỗi DDS thượng nguồn ─────────────────────────────────── */
+.dds-chain{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);background:var(--card);}
+.dds-step{padding:18px 20px;border-right:1px solid var(--line);}
+.dds-step:last-child{border-right:none;}
+.dds-step .k{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--kraft);font-weight:700;margin-bottom:9px;}
+.dds-step .v{font-size:13.5px;font-weight:600;line-height:1.35;margin-bottom:4px;}
+.dds-step .m{font-size:11.5px;color:var(--ink-3);line-height:1.5;}
+.field{margin-bottom:11px;}
+.field .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin-bottom:3px;}
+.field .val{font-size:13px;font-weight:500;line-height:1.4;word-break:break-word;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+#map{height:320px;width:100%;}
+.map-note{padding:10px 16px;font-size:11.5px;color:var(--red);background:var(--red-soft);border-bottom:1px solid var(--line);}
+
+.callout{border:1px solid var(--line);border-left:4px solid var(--red);background:var(--red-soft);padding:15px 18px;font-size:13px;line-height:1.6;}
+.callout b{font-weight:700;}
+.callout.info{border-left-color:var(--kraft);background:var(--kraft-soft);}
+.callout.ok{border-left-color:var(--forest);background:var(--forest-soft);}
+
+.footer{margin-top:44px;background:var(--ink);color:#fff;padding:20px 26px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.footer .t{font-family:"Archivo";font-size:14px;font-weight:700;}
+.footer .s{font-size:11.5px;color:rgba(255,255,255,.5);margin-top:3px;}
+.footer .r{text-align:right;font-size:11.5px;color:rgba(255,255,255,.5);}
+
+.crumb{font-size:12px;color:var(--ink-3);margin-bottom:14px;}
+.crumb a{color:var(--kraft);border-bottom:1px dotted var(--kraft);}
+
+@media(max-width:820px){
+  .stat-strip{grid-template-columns:1fr 1fr;}
+  .stat-strip .st{border-bottom:1px solid var(--line);}
+  .dds-chain,.grid-3,.grid-2{grid-template-columns:1fr;}
+  .dds-step{border-right:none;border-bottom:1px solid var(--line);}
+  .hero{flex-direction:column;}
+  .mini-search input{width:130px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ TRANG TRA CỨU ══════════ -->
+<div id="page-search" class="page">
+  <div class="search-inner">
+    <div class="eyebrow">Go-Pak Paper Products · Chuỗi hành trình sản phẩm</div>
+    <h1>Tra cứu<br><em>nguồn gốc</em> lô hàng</h1>
+    <p class="lede">Nhập mã đơn hàng khách, mã thành phẩm hoặc mã nguyên liệu để xem toàn bộ hành trình
+      từ hồ sơ DDS của nhà cung cấp giấy đến lô thành phẩm xuất kho — dựng trên dữ liệu ledger NAV thực tế.</p>
+
+    <div class="mode-row" id="modeRow">
+      <button class="mode-btn active" data-mode="po">Mã đơn khách (PO)</button>
+      <button class="mode-btn" data-mode="fg">Mã thành phẩm</button>
+      <button class="mode-btn" data-mode="item">Mã nguyên liệu</button>
+      <button class="mode-btn" data-mode="dds">Hồ sơ DDS</button>
+      <button class="mode-btn" data-mode="roll">Mã cuộn (Roll No.)</button>
+    </div>
+
+    <form class="search-bar" id="searchForm">
+      <input id="searchInput" type="text" placeholder="VD: PO035999" autocomplete="off">
+      <button type="submit">Tra cứu</button>
+    </form>
+    <div class="hint" id="searchHint"></div>
+
+    <div class="search-foot">
+      <div><b>221</b> bút toán ledger NAV</div>
+      <div><b>1</b> hồ sơ DDS nhà cung cấp</div>
+      <div><b>3</b> khu rừng nguồn gốc</div>
+      <div><b>3</b> khoảng trống dữ liệu chính</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ TRANG HỒ SƠ (PO / FG / ITEM / DDS) ══════════ -->
+<div id="page-record" class="page">
+  <div class="topbar">
+    <div class="brand">
+      <b>GO-PAK</b><span class="sep"></span><span>Truy xuất nguồn gốc · EUDR</span>
+    </div>
+    <div class="tools">
+      <span class="mini-search">
+        <input id="topSearch" placeholder="PO035999 / D43033 / 80103-015.02">
+        <button id="topSearchBtn">Tra cứu</button>
+      </span>
+      <button class="btn-ghost" onclick="window.print()">In hồ sơ</button>
+      <a class="btn-ghost" href="?">Trang chủ</a>
+    </div>
+  </div>
+  <div class="wrap" id="recordBody"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script id="gopak-data" type="application/json">{"ledger":[{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"20","fg":"D43033","entry":"1391612","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083520","order":"PRO-QC_26081789","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-20","fg":"D43033","entry":"1391618","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083520","order":"PRO-QC_26081789","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"20","fg":"D43033","entry":"1391619","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083550","order":"QC-FG_26081598","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"-20","fg":"D43033","entry":"1391774","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083550","order":"QC-FG_26081598","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"20","fg":"D43033","entry":"1391775","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"20","fg":"D43033","entry":"1391794","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083560","order":"PRO-QC_26081800","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-20","fg":"D43033","entry":"1391801","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083560","order":"PRO-QC_26081800","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"20","fg":"D43033","entry":"1391802","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"20","fg":"D43033","entry":"1391819","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083568","order":"PRO-QC_26081808","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-20","fg":"D43033","entry":"1391824","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083568","order":"PRO-QC_26081808","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"20","fg":"D43033","entry":"1391825","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083574","order":"QC-FG_26081608","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"-80","fg":"D43033","entry":"1391840","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083574","order":"QC-FG_26081608","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"80","fg":"D43033","entry":"1391841","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"20","fg":"D43033","entry":"1391892","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083594","order":"PRO-QC_26081832","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-20","fg":"D43033","entry":"1391895","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083594","order":"PRO-QC_26081832","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"20","fg":"D43033","entry":"1391896","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"3","fg":"D43033","entry":"1391920","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083604","order":"QC-FG_26081614","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"-20","fg":"D43033","entry":"1391967","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083604","order":"QC-FG_26081614","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"20","fg":"D43033","entry":"1391968","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083426","order":"QC-FG_26081608","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-80","fg":"D43033","entry":"1392087","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083426","order":"QC-FG_26081608","item":"D43033","po":"PO035999","loc":"WH_FG","qty":"80","fg":"D43033","entry":"1392088","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-011.03","po":"0000000","loc":"WH_PROD","qty":"-203","fg":"","entry":"1392204","desc":"PE Coated Paper 645mm, 300gsm 18 PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-011.03","po":"0000000","loc":"INTRANSIT","qty":"15","fg":"","entry":"1392205","desc":"PE Coated Paper 645mm, 300gsm 18 PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-011.03","po":"0000000","loc":"INTRANSIT","qty":"188","fg":"","entry":"1392206","desc":"PE Coated Paper 645mm, 300gsm 18 PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-011.01","po":"0000000","loc":"WH_PROD","qty":"-183","fg":"","entry":"1392207","desc":"PE Coated Paper 645mm, 280gsm 18PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-011.01","po":"0000000","loc":"INTRANSIT","qty":"4","fg":"","entry":"1392208","desc":"PE Coated Paper 645mm, 280gsm 18PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-011.01","po":"0000000","loc":"INTRANSIT","qty":"179","fg":"","entry":"1392209","desc":"PE Coated Paper 645mm, 280gsm 18PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80107-001.02","po":"0000000","loc":"WH_PROD","qty":"-529","fg":"","entry":"1392210","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80107-001.02","po":"0000000","loc":"INTRANSIT","qty":"439.88","fg":"","entry":"1392211","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80107-001.02","po":"0000000","loc":"INTRANSIT","qty":"89.12","fg":"","entry":"1392212","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-043.01","po":"0000000","loc":"WH_PROD","qty":"-99","fg":"","entry":"1392213","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083619","order":"PRO-PLAN_26080018","item":"80101-043.01","po":"0000000","loc":"INTRANSIT","qty":"99","fg":"","entry":"1392214","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-011.03","po":"0000000","loc":"INTRANSIT","qty":"-203","fg":"","entry":"1392241","desc":"PE Coated Paper 645mm, 300gsm 18 PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-011.03","po":"0000000","loc":"WH_PLAN","qty":"15","fg":"","entry":"1392242","desc":"PE Coated Paper 645mm, 300gsm 18 PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-011.03","po":"0000000","loc":"WH_PLAN","qty":"188","fg":"","entry":"1392243","desc":"PE Coated Paper 645mm, 300gsm 18 PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-011.01","po":"0000000","loc":"INTRANSIT","qty":"-183","fg":"","entry":"1392244","desc":"PE Coated Paper 645mm, 280gsm 18PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-011.01","po":"0000000","loc":"WH_PLAN","qty":"4","fg":"","entry":"1392245","desc":"PE Coated Paper 645mm, 280gsm 18PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-011.01","po":"0000000","loc":"WH_PLAN","qty":"179","fg":"","entry":"1392246","desc":"PE Coated Paper 645mm, 280gsm 18PE Matt","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80107-001.02","po":"0000000","loc":"INTRANSIT","qty":"-529","fg":"","entry":"1392247","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80107-001.02","po":"0000000","loc":"WH_PLAN","qty":"439.88","fg":"","entry":"1392248","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80107-001.02","po":"0000000","loc":"WH_PLAN","qty":"89.12","fg":"","entry":"1392249","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-043.01","po":"0000000","loc":"INTRANSIT","qty":"-99","fg":"","entry":"1392250","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083469","order":"PRO-PLAN_26080018","item":"80101-043.01","po":"0000000","loc":"WH_PLAN","qty":"99","fg":"","entry":"1392251","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"WH_PLAN","qty":"-180","fg":"","entry":"1392260","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"INTRANSIT","qty":"47.72","fg":"","entry":"1392261","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"INTRANSIT","qty":"93","fg":"","entry":"1392262","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"INTRANSIT","qty":"39.28","fg":"","entry":"1392263","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80106-018.01","po":"0000000","loc":"WH_PLAN","qty":"-587","fg":"","entry":"1392264","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80106-018.01","po":"0000000","loc":"INTRANSIT","qty":"232.64","fg":"","entry":"1392265","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80106-018.01","po":"0000000","loc":"INTRANSIT","qty":"354.36","fg":"","entry":"1392266","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80106-005.01","po":"0000000","loc":"WH_PLAN","qty":"-105","fg":"","entry":"1392267","desc":"Bio polymer paper 740mm, 300gsm+25gsm Bio polymer","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80106-005.01","po":"0000000","loc":"INTRANSIT","qty":"105","fg":"","entry":"1392268","desc":"Bio polymer paper 740mm, 300gsm+25gsm Bio polymer","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80101-010.01","po":"0000000","loc":"WH_PLAN","qty":"-66","fg":"","entry":"1392269","desc":"PE Coated Paper 695mm210gsm 14 PE MATT","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083628","order":"PLAN-PRO_2608027","item":"80101-010.01","po":"0000000","loc":"INTRANSIT","qty":"66","fg":"","entry":"1392270","desc":"PE Coated Paper 695mm210gsm 14 PE MATT","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"20","fg":"D43033","entry":"1392350","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083644","order":"PRO-QC_26081869","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-20","fg":"D43033","entry":"1392351","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083644","order":"PRO-QC_26081869","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"3","fg":"D43033","entry":"1392352","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083644","order":"PRO-QC_26081869","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"17","fg":"D43033","entry":"1392353","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Positive Adjmt.","doc":"IA-P-2608020","order":"","item":"SCRAPT-T","po":"0000000","loc":"WH_SCRA","qty":"3540","fg":"SCRAPT-T","entry":"1392391","desc":"White scrap paper/ Giấy phế liệu trắng","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Positive Adjmt.","doc":"IA-P-2608020","order":"","item":"SCRAPT-B","po":"0000000","loc":"WH_SCRA","qty":"2000","fg":"","entry":"1392392","desc":"Brown scrap paper/ Giấy phế liệu nâu","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Sale","doc":"SS26080544","order":"","item":"SCRAPT-T","po":"0000000","loc":"WH_SCRA","qty":"-27720","fg":"SCRAPT-T","entry":"1392428","desc":"White scrap paper/ Giấy phế liệu trắng","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Sale","doc":"SS26080544","order":"","item":"SCRAPT-T","po":"0000000","loc":"WH_SCRA","qty":"-28300","fg":"SCRAPT-T","entry":"1392429","desc":"White scrap paper/ Giấy phế liệu trắng","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083658","order":"QC-FG_26081632","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"-20","fg":"D43033","entry":"1392474","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083658","order":"QC-FG_26081632","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"18","fg":"D43033","entry":"1392475","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083658","order":"QC-FG_26081632","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"2","fg":"D43033","entry":"1392476","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"17","fg":"D43033","entry":"1392490","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083663","order":"PRO-QC_26081876","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-20","fg":"D43033","entry":"1392491","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083663","order":"PRO-QC_26081876","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"3","fg":"D43033","entry":"1392492","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083663","order":"PRO-QC_26081876","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"17","fg":"D43033","entry":"1392493","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083495","order":"QC-FG_26081598","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1392605","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083495","order":"QC-FG_26081598","item":"D43033","po":"PO035999","loc":"WH_FG","qty":"20","fg":"D43033","entry":"1392606","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Negative Adjmt.","doc":"TRE2608090","order":"","item":"80207-009.01","po":"0000000","loc":"WH_RW","qty":"-90","fg":"","entry":"1392630","desc":"Túi PE tái chế/Sleeve recycled 30%,30micro 16cm x59.5cm","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Negative Adjmt.","doc":"TRE2608090","order":"","item":"80207-001.01","po":"0000000","loc":"WH_RW","qty":"-60","fg":"","entry":"1392631","desc":"Túi PE tái chế/Sleeve recycled 30%,30micro 22cm x70cm","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Negative Adjmt.","doc":"TRE2608090","order":"","item":"80207-005.01","po":"0000000","loc":"WH_RW","qty":"-120","fg":"","entry":"1392632","desc":"Túi PE tái chế/Sleeve recycled 30%,30micro 16cm x110cm","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Negative Adjmt.","doc":"TRE2608090","order":"","item":"80207-002.01","po":"0000000","loc":"WH_RW","qty":"-90","fg":"","entry":"1392633","desc":"Túi PE tái chế/Sleeve recycled 30%,30micro 16cm x75cm","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Negative Adjmt.","doc":"TRE2608090","order":"","item":"80207-013.01","po":"0000000","loc":"WH_RW","qty":"-431.4","fg":"","entry":"1392634","desc":"Màng film/ Unprinted PE wrapping film recycled 30%, 30microns W660mm","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Output","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"14","fg":"D43033","entry":"1392692","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083686","order":"PRO-QC_26081893","item":"D43033","po":"PO035999","loc":"WH_PROD","qty":"-14","fg":"D43033","entry":"1392693","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTS26083686","order":"PRO-QC_26081893","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"14","fg":"D43033","entry":"1392694","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80101-009.01","po":"PO035999","loc":"WH_PROD","qty":"-2273","fg":"D43033","entry":"1392741","desc":"Giấy phủ PE 1 mặt/PE Coated Paper 919mm250gsm18 PE MATT (100% PEFC certified)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80102-003.02","po":"PO035999","loc":"WH_PROD","qty":"-663","fg":"D43033","entry":"1392742","desc":"Double PE Coated Paper 100mm, 210gsm+22gsm+12gsm (100% PEFC certified)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80103-013.02","po":"PO035999","loc":"WH_PROD","qty":"-2755","fg":"D43033","entry":"1392743","desc":"Kraftliner paper 820mm 120gsm (KT120) (100% PEFC Certified)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80201-080.01","po":"PO035999","loc":"WH_PROD","qty":"-454","fg":"D43033","entry":"1392744","desc":"D43033/Thùng carton 5 lớp 19oz Ripple 500pk","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80101-016.01","po":"PO035999","loc":"WH_PROD","qty":"-320","fg":"D43033","entry":"1392745","desc":"Giấy phủ PE 1 mặt/ PE Coated Paper 865mm 250gsm18 PE MATT (100% PEFC certified)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80103-013.02","po":"PO035999","loc":"WH_PROD","qty":"-98","fg":"D43033","entry":"1392746","desc":"Kraftliner paper 820mm 120gsm (KT120) (100% PEFC Certified)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Consumption","doc":"REL_PO_2607405","order":"REL_PO_2607405","item":"80101-016.01","po":"PO035999","loc":"WH_PROD","qty":"-12","fg":"D43033","entry":"1392747","desc":"Giấy phủ PE 1 mặt/ PE Coated Paper 865mm 250gsm18 PE MATT (100% PEFC certified)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083510","order":"PRO-QC_26081808","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1392789","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083510","order":"PRO-QC_26081808","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"20","fg":"D43033","entry":"1392790","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083518","order":"PRO-QC_26081789","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1392832","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083518","order":"PRO-QC_26081789","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"20","fg":"D43033","entry":"1392833","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"INTRANSIT","qty":"-180","fg":"","entry":"1392998","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"WH_PROD","qty":"47.72","fg":"","entry":"1392999","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"WH_PROD","qty":"93","fg":"","entry":"1393000","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80101-039.02","po":"0000000","loc":"WH_PROD","qty":"39.28","fg":"","entry":"1393001","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80106-018.01","po":"0000000","loc":"INTRANSIT","qty":"-587","fg":"","entry":"1393002","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80106-018.01","po":"0000000","loc":"WH_PROD","qty":"232.64","fg":"","entry":"1393003","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80106-018.01","po":"0000000","loc":"WH_PROD","qty":"354.36","fg":"","entry":"1393004","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80106-005.01","po":"0000000","loc":"INTRANSIT","qty":"-105","fg":"","entry":"1393005","desc":"Bio polymer paper 740mm, 300gsm+25gsm Bio polymer","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80106-005.01","po":"0000000","loc":"WH_PROD","qty":"105","fg":"","entry":"1393006","desc":"Bio polymer paper 740mm, 300gsm+25gsm Bio polymer","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80101-010.01","po":"0000000","loc":"INTRANSIT","qty":"-66","fg":"","entry":"1393007","desc":"PE Coated Paper 695mm210gsm 14 PE MATT","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083542","order":"PLAN-PRO_2608027","item":"80101-010.01","po":"0000000","loc":"WH_PROD","qty":"66","fg":"","entry":"1393008","desc":"PE Coated Paper 695mm210gsm 14 PE MATT","cert":"100% PEFC CERT","note":"chênh lệch","ref":"","src":"PO035999000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80107-002.02","po":"0000000","loc":"WH_PROD","qty":"-161","fg":"","entry":"1393073","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80107-002.02","po":"0000000","loc":"INTRANSIT","qty":"33.84","fg":"","entry":"1393074","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80107-002.02","po":"0000000","loc":"INTRANSIT","qty":"127.16","fg":"","entry":"1393075","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80106-018.01","po":"0000000","loc":"WH_PROD","qty":"-880","fg":"","entry":"1393076","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80106-018.01","po":"0000000","loc":"INTRANSIT","qty":"880","fg":"","entry":"1393077","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80101-016.01","po":"0000000","loc":"WH_PROD","qty":"-120","fg":"","entry":"1393078","desc":"PE Coated Paper 865mm 250gsm18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083740","order":"PRO-PLAN_26080019","item":"80101-016.01","po":"0000000","loc":"INTRANSIT","qty":"120","fg":"","entry":"1393079","desc":"PE Coated Paper 865mm 250gsm18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTS26083740","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80107-002.02","po":"0000000","loc":"INTRANSIT","qty":"-161","fg":"","entry":"1393080","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80107-002.02","po":"0000000","loc":"WH_PLAN","qty":"33.84","fg":"","entry":"1393081","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80107-002.02","po":"0000000","loc":"WH_PLAN","qty":"127.16","fg":"","entry":"1393082","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80106-018.01","po":"0000000","loc":"INTRANSIT","qty":"-880","fg":"","entry":"1393083","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80106-018.01","po":"0000000","loc":"WH_PLAN","qty":"880","fg":"","entry":"1393084","desc":"Bio polymer paper 1090mm 280gsm+25gsm Bio Polymer","cert":"","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80101-016.01","po":"0000000","loc":"INTRANSIT","qty":"-120","fg":"","entry":"1393085","desc":"PE Coated Paper 865mm 250gsm18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083548","order":"PRO-PLAN_26080019","item":"80101-016.01","po":"0000000","loc":"WH_PLAN","qty":"120","fg":"","entry":"1393086","desc":"PE Coated Paper 865mm 250gsm18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTR26083548","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083741","order":"PLAN-PRO_2608028","item":"80108-002.01","po":"0000000","loc":"WH_PLAN","qty":"-56","fg":"","entry":"1393092","desc":"Ally King Pro 740mm 235gsm (APP)(Gloss paper)","cert":"","note":"chênh lệch","ref":"PTS26083741","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083741","order":"PLAN-PRO_2608028","item":"80108-002.01","po":"0000000","loc":"INTRANSIT","qty":"45.68","fg":"","entry":"1393093","desc":"Ally King Pro 740mm 235gsm (APP)(Gloss paper)","cert":"","note":"chênh lệch","ref":"PTS26083741","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083741","order":"PLAN-PRO_2608028","item":"80108-002.01","po":"0000000","loc":"INTRANSIT","qty":"10.32","fg":"","entry":"1393094","desc":"Ally King Pro 740mm 235gsm (APP)(Gloss paper)","cert":"","note":"chênh lệch","ref":"PTS26083741","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083741","order":"PLAN-PRO_2608028","item":"80101-043.01","po":"0000000","loc":"WH_PLAN","qty":"-358","fg":"","entry":"1393095","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"chênh lệch","ref":"PTS26083741","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083741","order":"PLAN-PRO_2608028","item":"80101-043.01","po":"0000000","loc":"INTRANSIT","qty":"259","fg":"","entry":"1393096","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"chênh lệch","ref":"PTS26083741","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTS26083741","order":"PLAN-PRO_2608028","item":"80101-043.01","po":"0000000","loc":"INTRANSIT","qty":"99","fg":"","entry":"1393097","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"chênh lệch","ref":"PTS26083741","src":"PO031588000000011"},{"date":"2026-08-24","type":"Sale","doc":"SS26080545","order":"","item":"SCRAPT-B","po":"0000000","loc":"WH_SCRA","qty":"-27680","fg":"","entry":"1393110","desc":"Brown scrap paper/ Giấy phế liệu nâu","cert":"","note":"","ref":"SS26080545","src":"PO031588000000011"},{"date":"2026-08-24","type":"Purchase","doc":"GR2608260","order":"","item":"80101-040.01","po":"0000000","loc":"WH_RW","qty":"51519","fg":"","entry":"1393482","desc":"PE Coated Paper 1090mm 280gsm 18 PE MATT","cert":"","note":"","ref":"GR2608260","src":"PO031588000000011"},{"date":"2026-08-24","type":"Purchase","doc":"GR2608260","order":"","item":"80101-039.02","po":"0000000","loc":"WH_RW","qty":"26047","fg":"","entry":"1393483","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"","ref":"GR2608260","src":"PO031588000000011"},{"date":"2026-08-24","type":"Purchase","doc":"GR2608260","order":"","item":"80101-012.01","po":"0000000","loc":"WH_RW","qty":"5099","fg":"","entry":"1393484","desc":"PE Coated Paper 672mm, 250gsm18PE Matt","cert":"100% PEFC CERT","note":"","ref":"GR2608260","src":"PO031588000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083566","order":"QC-FG_26081632","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1393511","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083566","order":"QC-FG_26081632","item":"D43033","po":"PO035999","loc":"WH_FG","qty":"18","fg":"D43033","entry":"1393512","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083566","order":"QC-FG_26081632","item":"D43033","po":"PO035999","loc":"WH_FG","qty":"2","fg":"D43033","entry":"1393513","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Purchase","doc":"GR2608261","order":"","item":"80203-024.01","po":"0000000","loc":"WH_RW","qty":"61","fg":"","entry":"1393534","desc":"Sleeve PELD 40 microns16cm x61 cm(Inner XD02013DW)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Purchase","doc":"GR2608262","order":"","item":"80202-021.01","po":"0000000","loc":"WH_RW","qty":"335.5","fg":"","entry":"1393535","desc":"Printed POF wrapping film 25mic 20oz XD61004APG","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Purchase","doc":"GR2608262","order":"","item":"80203-088.01","po":"0000000","loc":"WH_RW","qty":"198","fg":"","entry":"1393536","desc":"Sleeve 40 microns 28cm x65cm CA018LW","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608091","order":"","item":"80204-104.01","po":"0000000","loc":"WH_RW","qty":"-1000","fg":"","entry":"1393545","desc":"Nhãn dán/ label D41113 (65x135)mm","cert":"","note":"","ref":"TRE2608091","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608091","order":"","item":"80204-099.01","po":"0000000","loc":"WH_RW","qty":"-3000","fg":"","entry":"1393546","desc":"Nhãn dán/ label D41115 (65x135)mm","cert":"","note":"","ref":"TRE2608091","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608091","order":"","item":"80204-096.01","po":"0000000","loc":"WH_RW","qty":"-1000","fg":"","entry":"1393547","desc":"Nhãn dán/ label D40013 (65x135)mm","cert":"","note":"","ref":"TRE2608091","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608092","order":"","item":"SRA-001","po":"0000000","loc":"WH_SP","qty":"-84","fg":"","entry":"1393548","desc":"Wrapping film/Màng quấn PE 2.7kg*500mm*18mic (PE 100%)","cert":"","note":"","ref":"TRE2608092","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608092","order":"","item":"80207-008.01","po":"0000000","loc":"WH_RW","qty":"-90","fg":"","entry":"1393549","desc":"Túi PE tái chế/Sleeve recycled 30%,30micro 14cm x 59.5cm","cert":"","note":"","ref":"TRE2608092","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608092","order":"","item":"TAPE_48-90","po":"0000000","loc":"WH_RW","qty":"-240","fg":"","entry":"1393550","desc":"Duct tape/Băng keo trong OPP 48mm x 55mic x 90yards","cert":"","note":"","ref":"TRE2608092","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608093","order":"","item":"TAP-004","po":"0000000","loc":"WH_RW","qty":"-200","fg":"","entry":"1393551","desc":"Duct tape/Băng keo trong OPP 60mm x 55mic x 90met","cert":"","note":"","ref":"TRE2608093","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608094","order":"","item":"80305-001.01","po":"0000000","loc":"WH_RW","qty":"-500","fg":"","entry":"1393552","desc":"Bột bắp/Corn Starch","cert":"","note":"","ref":"TRE2608094","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608095","order":"","item":"80303-001.05","po":"0000000","loc":"WH_RW","qty":"-100","fg":"","entry":"1393553","desc":"Keo nóng/Hot melt glue 717J (25kg/bag)","cert":"","note":"","ref":"TRE2608095","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608095","order":"","item":"80303-002.06","po":"0000000","loc":"WH_RW","qty":"-300","fg":"","entry":"1393554","desc":"Keo lạnh/Cold glue 293C (20kg/thùng)","cert":"","note":"","ref":"TRE2608095","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608096","order":"","item":"80301-001.04","po":"0000000","loc":"WH_RW","qty":"-120","fg":"","entry":"1393555","desc":"Mực in màu đen kháng trầy K1020/Ink Black K1020 ( kraft)","cert":"","note":"","ref":"TRE2608096","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608096","order":"","item":"80301-008.02","po":"0000000","loc":"WH_RW","qty":"-175","fg":"","entry":"1393556","desc":"Mực in màu trắng 0418W/Ink Supper White 0418W","cert":"","note":"","ref":"TRE2608096","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608096","order":"","item":"80301-015.02","po":"0000000","loc":"WH_RW","qty":"-220","fg":"","entry":"1393557","desc":"Dầu bóng/Varnish OPV GPK005-2","cert":"","note":"","ref":"TRE2608096","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608096","order":"","item":"80301-034.01","po":"0000000","loc":"WH_RW","qty":"-100","fg":"","entry":"1393558","desc":"Mực in Medium DPE GPK100/Ink Medium DPE GPK100 (Giảm màu)","cert":"","note":"","ref":"TRE2608096","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608096","order":"","item":"80301-003.03","po":"0000000","loc":"WH_RW","qty":"-40","fg":"","entry":"1393559","desc":"Mực in màu magenta R3121 A/Ink Magenta R3121 A","cert":"","note":"","ref":"TRE2608096","src":"PO031588000000011"},{"date":"2026-08-24","type":"Negative Adjmt.","doc":"TRE2608096","order":"","item":"80301-036.01","po":"0000000","loc":"WH_RW","qty":"-40","fg":"","entry":"1393560","desc":"Ink Red 185C/ Mực màu đỏ 185C","cert":"","note":"","ref":"TRE2608096","src":"PO031588000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083629","order":"PRO-QC_26081869","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1393813","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083629","order":"PRO-QC_26081869","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"3","fg":"D43033","entry":"1393814","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083629","order":"PRO-QC_26081869","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"17","fg":"D43033","entry":"1393815","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083639","order":"PLAN-PRO_2608028","item":"80108-002.01","po":"0000000","loc":"INTRANSIT","qty":"-56","fg":"","entry":"1393995","desc":"Ally King Pro 740mm 235gsm (APP)(Gloss paper)","cert":"","note":"chênh lệch","ref":"PTR26083639","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083639","order":"PLAN-PRO_2608028","item":"80108-002.01","po":"0000000","loc":"WH_PROD","qty":"45.68","fg":"","entry":"1393996","desc":"Ally King Pro 740mm 235gsm (APP)(Gloss paper)","cert":"","note":"chênh lệch","ref":"PTR26083639","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083639","order":"PLAN-PRO_2608028","item":"80108-002.01","po":"0000000","loc":"WH_PROD","qty":"10.32","fg":"","entry":"1393997","desc":"Ally King Pro 740mm 235gsm (APP)(Gloss paper)","cert":"","note":"chênh lệch","ref":"PTR26083639","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083639","order":"PLAN-PRO_2608028","item":"80101-043.01","po":"0000000","loc":"INTRANSIT","qty":"-358","fg":"","entry":"1393998","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"chênh lệch","ref":"PTR26083639","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083639","order":"PLAN-PRO_2608028","item":"80101-043.01","po":"0000000","loc":"WH_PROD","qty":"259","fg":"","entry":"1393999","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"chênh lệch","ref":"PTR26083639","src":"PO031588000000011"},{"date":"2026-08-24","type":"Transfer","doc":"PTR26083639","order":"PLAN-PRO_2608028","item":"80101-043.01","po":"0000000","loc":"WH_PROD","qty":"99","fg":"","entry":"1394000","desc":"PE Coated Paper 1210mm 320gsm 18 PE MATT 100% PEFC","cert":"","note":"chênh lệch","ref":"PTR26083639","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"WH_PROD","qty":"-629","fg":"","entry":"1394084","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"INTRANSIT","qty":"106.8","fg":"","entry":"1394085","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"INTRANSIT","qty":"185.6","fg":"","entry":"1394086","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"INTRANSIT","qty":"101","fg":"","entry":"1394087","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"INTRANSIT","qty":"235.6","fg":"","entry":"1394088","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80101-013.01","po":"0000000","loc":"WH_PROD","qty":"-77","fg":"","entry":"1394089","desc":"PE Coated Paper 820mm 300gsm 18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80101-013.01","po":"0000000","loc":"INTRANSIT","qty":"77","fg":"","entry":"1394090","desc":"PE Coated Paper 820mm 300gsm 18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80103-015.02","po":"0000000","loc":"WH_PROD","qty":"-577","fg":"","entry":"1394091","desc":"Kraftliner paper 740mm 275gsm (KP275)","cert":"70% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80103-015.02","po":"0000000","loc":"INTRANSIT","qty":"66","fg":"","entry":"1394092","desc":"Kraftliner paper 740mm 275gsm (KP275)","cert":"70% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80103-015.02","po":"0000000","loc":"INTRANSIT","qty":"511","fg":"","entry":"1394093","desc":"Kraftliner paper 740mm 275gsm (KP275)","cert":"70% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80102-016.02","po":"0000000","loc":"WH_PROD","qty":"-443","fg":"","entry":"1394094","desc":"Double PE Coated Paper 740mm,250gsm+18gsm+16gsm","cert":"100% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80102-016.02","po":"0000000","loc":"INTRANSIT","qty":"443","fg":"","entry":"1394095","desc":"Double PE Coated Paper 740mm,250gsm+18gsm+16gsm","cert":"100% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80107-001.02","po":"0000000","loc":"WH_PROD","qty":"-350","fg":"","entry":"1394096","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80107-001.02","po":"0000000","loc":"INTRANSIT","qty":"350","fg":"","entry":"1394097","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80106-001.03","po":"0000000","loc":"WH_PROD","qty":"-585","fg":"","entry":"1394098","desc":"PLA coated paper 865mm 280gsm+30gsm(+/-4gsm) PLA","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80106-001.03","po":"0000000","loc":"INTRANSIT","qty":"95","fg":"","entry":"1394099","desc":"PLA coated paper 865mm 280gsm+30gsm(+/-4gsm) PLA","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083869","order":"PRO-PLAN_26080020","item":"80106-001.03","po":"0000000","loc":"INTRANSIT","qty":"490","fg":"","entry":"1394100","desc":"PLA coated paper 865mm 280gsm+30gsm(+/-4gsm) PLA","cert":"","note":"","ref":"PTS26083869","src":"PO031588000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083675","order":"QC-FG_26081614","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1394168","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083675","order":"QC-FG_26081614","item":"D43033","po":"PO035999","loc":"WH_FG","qty":"20","fg":"D43033","entry":"1394169","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"INTRANSIT","qty":"-629","fg":"","entry":"1394339","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"WH_PLAN","qty":"106.8","fg":"","entry":"1394340","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"WH_PLAN","qty":"185.6","fg":"","entry":"1394341","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"WH_PLAN","qty":"101","fg":"","entry":"1394342","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80108-001.01","po":"0000000","loc":"WH_PLAN","qty":"235.6","fg":"","entry":"1394343","desc":"Ally King Pro 888mm 235gsm (APP)(Gloss paper)","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80101-013.01","po":"0000000","loc":"INTRANSIT","qty":"-77","fg":"","entry":"1394344","desc":"PE Coated Paper 820mm 300gsm 18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80101-013.01","po":"0000000","loc":"WH_PLAN","qty":"77","fg":"","entry":"1394345","desc":"PE Coated Paper 820mm 300gsm 18 PE MATT","cert":"100% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80103-015.02","po":"0000000","loc":"INTRANSIT","qty":"-577","fg":"","entry":"1394346","desc":"Kraftliner paper 740mm 275gsm (KP275)","cert":"70% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80103-015.02","po":"0000000","loc":"WH_PLAN","qty":"66","fg":"","entry":"1394347","desc":"Kraftliner paper 740mm 275gsm (KP275)","cert":"70% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80103-015.02","po":"0000000","loc":"WH_PLAN","qty":"511","fg":"","entry":"1394348","desc":"Kraftliner paper 740mm 275gsm (KP275)","cert":"70% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80102-016.02","po":"0000000","loc":"INTRANSIT","qty":"-443","fg":"","entry":"1394349","desc":"Double PE Coated Paper 740mm,250gsm+18gsm+16gsm","cert":"100% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80102-016.02","po":"0000000","loc":"WH_PLAN","qty":"443","fg":"","entry":"1394350","desc":"Double PE Coated Paper 740mm,250gsm+18gsm+16gsm","cert":"100% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80107-001.02","po":"0000000","loc":"INTRANSIT","qty":"-350","fg":"","entry":"1394351","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80107-001.02","po":"0000000","loc":"WH_PLAN","qty":"350","fg":"","entry":"1394352","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80106-001.03","po":"0000000","loc":"INTRANSIT","qty":"-585","fg":"","entry":"1394353","desc":"PLA coated paper 865mm 280gsm+30gsm(+/-4gsm) PLA","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80106-001.03","po":"0000000","loc":"WH_PLAN","qty":"95","fg":"","entry":"1394354","desc":"PLA coated paper 865mm 280gsm+30gsm(+/-4gsm) PLA","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTR26083715","order":"PRO-PLAN_26080020","item":"80106-001.03","po":"0000000","loc":"WH_PLAN","qty":"490","fg":"","entry":"1394355","desc":"PLA coated paper 865mm 280gsm+30gsm(+/-4gsm) PLA","cert":"","note":"","ref":"PTR26083715","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083878","order":"PLAN-PRO_2608029","item":"80101-039.03","po":"0000000","loc":"WH_PLAN","qty":"-408","fg":"","entry":"1394486","desc":"PE Coated Paper1190mm300gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"PTS26083878","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083878","order":"PLAN-PRO_2608029","item":"80101-039.03","po":"0000000","loc":"INTRANSIT","qty":"408","fg":"","entry":"1394487","desc":"PE Coated Paper1190mm300gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"chênh lệch","ref":"PTS26083878","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083878","order":"PLAN-PRO_2608029","item":"80106-017.02","po":"0000000","loc":"WH_PLAN","qty":"-72","fg":"","entry":"1394488","desc":"Bio polymer paper1190mm300gsm+25gsm(100%PEFC/EUDR)","cert":"","note":"chênh lệch","ref":"PTS26083878","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083878","order":"PLAN-PRO_2608029","item":"80106-017.02","po":"0000000","loc":"INTRANSIT","qty":"72","fg":"","entry":"1394489","desc":"Bio polymer paper1190mm300gsm+25gsm(100%PEFC/EUDR)","cert":"","note":"chênh lệch","ref":"PTS26083878","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083878","order":"PLAN-PRO_2608029","item":"80108-008.01","po":"0000000","loc":"WH_PLAN","qty":"-20","fg":"","entry":"1394490","desc":"Ally King Pro 815mm 235gsm (Gloss paper, GC1)","cert":"FSC MIX CREDIT","note":"chênh lệch","ref":"PTS26083878","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"PTS26083878","order":"PLAN-PRO_2608029","item":"80108-008.01","po":"0000000","loc":"INTRANSIT","qty":"20","fg":"","entry":"1394491","desc":"Ally King Pro 815mm 235gsm (Gloss paper, GC1)","cert":"FSC MIX CREDIT","note":"chênh lệch","ref":"PTS26083878","src":"PO031588000000011"},{"date":"2026-08-24","type":"Positive Adjmt.","doc":"IA-P-2608021","order":"","item":"SCRAPT-T","po":"0000000","loc":"WH_SCRA","qty":"8260","fg":"SCRAPT-T","entry":"1394505","desc":"White scrap paper/ Giấy phế liệu trắng","cert":"","note":"","ref":"IA-P-2608021","src":"PO031588000000011"},{"date":"2026-08-24","type":"Positive Adjmt.","doc":"IA-P-2608021","order":"","item":"SCRAPT-B","po":"0000000","loc":"WH_SCRA","qty":"2200","fg":"","entry":"1394506","desc":"Brown scrap paper/ Giấy phế liệu nâu","cert":"","note":"","ref":"IA-P-2608021","src":"PO031588000000011"},{"date":"2026-08-25","type":"Positive Adjmt.","doc":"IA-P-2608022","order":"","item":"SCRAPT-T","po":"0000000","loc":"WH_SCRA","qty":"6820","fg":"SCRAPT-T","entry":"1394507","desc":"White scrap paper/ Giấy phế liệu trắng","cert":"","note":"","ref":"IA-P-2608022","src":"PO031588000000011"},{"date":"2026-08-25","type":"Positive Adjmt.","doc":"IA-P-2608022","order":"","item":"SCRAPT-B","po":"0000000","loc":"WH_SCRA","qty":"2180","fg":"","entry":"1394508","desc":"Brown scrap paper/ Giấy phế liệu nâu","cert":"","note":"","ref":"IA-P-2608022","src":"PO031588000000011"},{"date":"2026-08-25","type":"Sale","doc":"SS26080560","order":"","item":"SCRAPT-B","po":"0000000","loc":"WH_SCRA","qty":"-21740","fg":"","entry":"1394509","desc":"Brown scrap paper/ Giấy phế liệu nâu","cert":"","note":"","ref":"SS26080560","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"TPD2608027","order":"","item":"80201-2011.01","po":"0000000","loc":"WH_RW","qty":"-2","fg":"","entry":"1394510","desc":"HUỶ - LỖI RÁCH KIỂM TẬN DỤNG TỒN THEO MAIL 24/8/2026","cert":"","note":"","ref":"TPD2608027","src":"PO031588000000011"},{"date":"2026-08-25","type":"Transfer","doc":"TPD2608027","order":"","item":"80201-2011.01","po":"0000000","loc":"WH_DAMAGED","qty":"2","fg":"","entry":"1394511","desc":"HUỶ - LỖI RÁCH KIỂM TẬN DỤNG TỒN THEO MAIL 24/8/2026","cert":"","note":"","ref":"TPD2608027","src":"PO031588000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083743","order":"PRO-QC_26081893","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-14","fg":"D43033","entry":"1394631","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083743","order":"PRO-QC_26081893","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"14","fg":"D43033","entry":"1394632","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083747","order":"PRO-QC_26081876","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1394639","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083747","order":"PRO-QC_26081876","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"3","fg":"D43033","entry":"1394640","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083747","order":"PRO-QC_26081876","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"17","fg":"D43033","entry":"1394641","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083759","order":"PRO-QC_26081832","item":"D43033","po":"PO035999","loc":"INTRANSIT","qty":"-20","fg":"D43033","entry":"1394668","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-22","type":"Transfer","doc":"PTR26083759","order":"PRO-QC_26081832","item":"D43033","po":"PO035999","loc":"WH_QC","qty":"20","fg":"D43033","entry":"1394669","desc":"19oz Ripple Pot (Black) (500pk)","cert":"","note":"","ref":"","src":"PO035999000000011"},{"date":"2026-08-25","type":"Purchase","doc":"GR2608273","order":"","item":"80107-002.02","po":"0000000","loc":"WH_RW","qty":"20163","fg":"","entry":"1394678","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"GR2608273","src":"PO031588000000011"},{"date":"2026-08-25","type":"Purchase","doc":"GR2608273","order":"","item":"80107-001.02","po":"0000000","loc":"WH_RW","qty":"5131","fg":"","entry":"1394679","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"GR2608273","src":"PO031588000000011"},{"date":"2026-08-25","type":"Purchase","doc":"GR2608274","order":"","item":"80107-001.02","po":"0000000","loc":"WH_RW","qty":"5131","fg":"","entry":"1394680","desc":"White base paper888mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"GR2608274","src":"PO031588000000011"},{"date":"2026-08-25","type":"Purchase","doc":"GR2608274","order":"","item":"80107-002.02","po":"0000000","loc":"WH_RW","qty":"20163","fg":"","entry":"1394681","desc":"White base paper740mm/280gsm (NO PE PAPER)","cert":"100% PEFC CERT","note":"","ref":"GR2608274","src":"PO031588000000011"},{"date":"2026-08-25","type":"Purchase","doc":"GR2608275","order":"","item":"80103-023.01","po":"0000000","loc":"WH_RW","qty":"25392","fg":"","entry":"1394685","desc":"Kraft paper board 810mm 310gsm","cert":"","note":"","ref":"GR2608275","src":"PO031588000000011"},{"date":"2026-08-25","type":"Purchase","doc":"GR2608275","order":"","item":"80103-023.01","po":"0000000","loc":"WH_RW","qty":"25000","fg":"","entry":"1394686","desc":"Kraft paper board 810mm 310gsm","cert":"","note":"","ref":"GR2608275","src":"PO031588000000011"},{"date":"2026-08-24","type":"Purchase","doc":"GR2608276","order":"","item":"80101-040.01","po":"0000000","loc":"WH_RW","qty":"9513","fg":"","entry":"1394689","desc":"PE Coated Paper 1090mm 280gsm 18 PE MATT","cert":"","note":"","ref":"GR2608276","src":"PO031588000000011"},{"date":"2026-08-24","type":"Purchase","doc":"GR2608276","order":"","item":"80101-039.02","po":"0000000","loc":"WH_RW","qty":"10422","fg":"","entry":"1394690","desc":"PE Coated Paper1190mm280gsm18PE MATT(100%PEFC/EUDR","cert":"","note":"","ref":"GR2608276","src":"PO031588000000011"},{"date":"2026-08-24","type":"Purchase","doc":"GR2608276","order":"","item":"80101-012.01","po":"0000000","loc":"WH_RW","qty":"5080","fg":"","entry":"1394691","desc":"PE Coated Paper 672mm, 250gsm18PE Matt","cert":"100% PEFC CERT","note":"","ref":"GR2608276","src":"PO031588000000011"}],"dds":[{"doc_no":"260804_sc_dds_eudr_form_pkp","title":"SOURCE OF FROM SUPPLIER","approved_by":"Mr. Tran Duc Thien — QA Section manager","no":"1","po_number":"2607057","contract":"","material_item":"PKP275","material_name":"Kraftliner paper 888mm 275gsm (KP275) (70% PEFC Certified), EUDR / Kraftliner paper 740mm 275gsm (KP275) (70% PEFC Certified), EUDR","material_type":"Recycled paper and virgin wood pulp","order_date":"2026-07-10","receiving_date":"05/08/2026 - 10/08/2026","invoice_no":"14260","packing_list":"420040205","lines":[{"line":1,"order_qty":"20000","received_qty":"20065","seller":{"code":"S00691","brand":"Vina Kraft Paper Co., LTD","type":"PEFC","cert":"IDN23220018","license":"IUPHHK: SK.703/Menhut-II/2013"},"mill":{"code":"893","name":"Vina Kraft Paper Co., LTD","address":"Lot D-6A-CN, My Phuoc 3 IP, Thoi Hoa Ward, Ho Chi Minh City, Viet Nam","country":"Viet Nam","type":"PEFC","cert":"IDN23220018","license":"IUPHHK: SK.703/Menhut-II/2013","claim":"70%PEFC certified","risk":"Low risk"},"pulp":{"supplier":"DRAGON CROWN (H.K.) TRADING LTD","pulp_type":"BHKP 100% PEFC","pulp_supplier":"PT Indah Kiat Pulp & Paper","cert":"SGSCH-PEFC-COC-300009","license":"IUPHHK: SK.703/Menhut-II/2013","country":"Indonesia","risk":"Standard risk"},"forests":[{"scientific":"Acasia crassicarpa, Acasia mangium, Eucalyptus Pelita","common":"Thick-podded Salwood; Black Wattle; Red Mahogany","country":"Indonesia","supplier":"PT. Arara Abadi","place":"Indonesia","type":"PEFC Certified","owner_type":"Plantation Forest","owner":"PT. Arara Abadi","start":"2025-03-10","end":"2025-04-24","map":"File: Geojson_ Dragon_ PT Arara Abadi","risk":"Standard risk","cert":"IDN23220018","lat":-0.5,"lng":101.9}]},{"line":2,"order_qty":"10000","received_qty":"10337","seller":{"code":"S00691","brand":"Vina Kraft Paper Co., LTD","type":"PEFC","cert":"SCS-NZS-001 / SCS-NZS-002","license":"Harvest Legality Letter: 06-2015-003"},"mill":{"code":"893","name":"Vina Kraft Paper Co., LTD","address":"Lot D-6A-CN, My Phuoc 3 IP, Thoi Hoa Ward, Ho Chi Minh City, Viet Nam","country":"Viet Nam","type":"PEFC","cert":"SCS-NZS-001 / SCS-NZS-002","license":"Harvest Legality Letter: 06-2015-003","claim":"70%PEFC certified","risk":"Low risk"},"pulp":{"supplier":"OJI FIBRE SOLUTIONS LTD","pulp_type":"UKP 100% PEFC","pulp_supplier":"OJIFS Tasman Mill","cert":"ITKUS-PEFC-COC-1712698","license":"Harvest Legality Letter: 06-2015-003","country":"New Zealand","risk":"Low risk"},"forests":[{"scientific":"Pinus radiata","common":"Radiata","country":"NewZealand","supplier":"Manulife Investment Forest Management NZ Ltd","place":"NewZealand","type":"PEFC Certified","owner_type":"Plantation Forest","owner":"Manulife Investment Forest Management NZ Ltd","start":"2024-11-20","end":"2026-01-13","map":"File: \"Fibre Source for Order Customer -137950\"_ Link: OTPP & Tiaki","risk":"Low risk","cert":"SCS-NZS-001","lat":-38.4,"lng":176.2},{"scientific":"Pinus radiata","common":"Radiata","country":"NewZealand","supplier":"Timberlands Ltd","place":"NewZealand","type":"PEFC Certified","owner_type":"Plantation Forest","owner":"Timberlands Ltd","start":"2024-11-20","end":"2026-01-13","map":"File: \"Fibre Source for Order Customer -137950\"_ Link: KTML","risk":"Low risk","cert":"SCS-NZS-002","lat":-38.1,"lng":176.5}]}]}]}</script>
+<script>
+/* ══════════════════════════════════════════════════════════════
+   Go-Pak · Cổng truy xuất nguồn gốc EUDR
+   Toàn bộ dữ liệu hiển thị lấy từ 3 nguồn khách hàng cung cấp:
+     · GPP_data - PO035999000000011.xlsx  (Item Ledger Entries, NAV)
+     · GPP_data - PO031588000000011.xlsx  (Item Ledger Entries, NAV)
+     · 260804_sc_dds_eudr_form_pkp.xlsx   (SOURCE OF FROM SUPPLIER — DDS)
+   Không bổ sung dữ liệu ngoài 3 nguồn trên. Chỗ nào thiếu thì hiển thị
+   là "thiếu dữ liệu", không suy đoán thay.
+   ══════════════════════════════════════════════════════════════ */
+const DATA = JSON.parse(document.getElementById('gopak-data').textContent);
+const LEDGER = DATA.ledger;
+const DDS_LIST = DATA.dds;
+
+const PRODUCER = {
+  name: 'Go-Pak Paper Products Vietnam',
+  role: 'Converter — in ấn, tráng phủ, cắt và tạo hình ly giấy',
+  erp: 'Microsoft Dynamics NAV (GPP_GOLIVE)',
+  server: 'server.gopakvietnam.org'
+};
+
+/* ── Tiện ích ───────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = v => { const n = Number(String(v).replace(/,/g, '')); return isNaN(n) ? null : n; };
+const fmt = v => { const n = num(v); return n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); };
+const dmy = s => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : (s || '—'); };
+const uniq = a => [...new Set(a)];
+const dash = v => (v === undefined || v === null || v === '') ? '—' : esc(v);
+
+function certChip(cert) {
+  if (!cert) return '<span class="chip none">Chưa khai báo</span>';
+  const c = cert.toUpperCase();
+  if (c.includes('FSC')) return `<span class="chip fsc">${esc(cert)}</span>`;
+  return `<span class="chip pefc">${esc(cert)}</span>`;
+}
+
+// Ý nghĩa tiền tố Order No. trong NAV của Go-Pak (theo luồng đã chốt ngày 25/08/2026)
+function orderKind(order) {
+  if (!order) return '';
+  if (order.startsWith('PLAN-PRO')) return 'WH_PLAN → WH_PROD';
+  if (order.startsWith('PRO-PLAN')) return 'WH_PROD → WH_PLAN (trả về)';
+  if (order.startsWith('PRO-QC')) return 'WH_PROD → WH_QC';
+  if (order.startsWith('QC-FG')) return 'WH_QC → WH_FG';
+  if (order.startsWith('REL_PO')) return 'Lệnh sản xuất';
+  return '';
+}
+
+function go(params) {
+  const q = new URLSearchParams(params);
+  window.location.href = '?' + q.toString();
+}
+
+/* ── Bảng bút toán dùng chung ───────────────────────────────── */
+function ledgerTable(rows, opts) {
+  opts = opts || {};
+  if (!rows.length) {
+    return `<div class="empty-row">${esc(opts.empty || 'Không có bút toán nào trong dữ liệu được cung cấp.')}</div>`;
+  }
+  const body = rows.map(r => {
+    const q = num(r.qty);
+    return `<tr>
+      <td class="mono">${dmy(r.date)}</td>
+      <td>${dash(r.type)}</td>
+      <td><span class="code">${dash(r.doc)}</span></td>
+      <td><span class="code">${dash(r.order)}</span>${r.order ? `<div style="font-size:10.5px;color:var(--ink-3);margin-top:2px">${esc(orderKind(r.order))}</div>` : ''}</td>
+      <td><span class="code code-lnk" data-item="${esc(r.item)}">${dash(r.item)}</span>
+          <div style="font-size:10.5px;color:var(--ink-3);margin-top:2px;max-width:280px">${dash(r.desc)}</div></td>
+      <td><span class="code">${dash(r.loc)}</span></td>
+      <td class="num ${q < 0 ? 'neg' : ''}">${fmt(r.qty)}</td>
+      <td><span class="code">${dash(r.fg)}</span></td>
+      <td>${r.cert ? certChip(r.cert) : '<span style="color:var(--ink-3)">—</span>'}</td>
+      <td class="mono" style="color:var(--ink-3)">${dash(r.entry)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="tbl-wrap"><table class="data">
+    <thead><tr>
+      <th>Ngày</th><th>Loại bút toán</th><th>Chứng từ</th><th>Lệnh / Order No.</th>
+      <th>Mã nguyên liệu / thành phẩm</th><th>Kho</th><th class="num">Số lượng</th>
+      <th>Item-FG</th><th>Chứng nhận rừng</th><th>Entry No.</th>
+    </tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function bindItemLinks(root) {
+  root.querySelectorAll('[data-item]').forEach(el => {
+    el.addEventListener('click', () => go({ item: el.getAttribute('data-item') }));
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HỒ SƠ THEO ĐƠN HÀNG KHÁCH (PO) — trục chính của bản demo
+   ══════════════════════════════════════════════════════════════ */
+function buildPoRecord(po) {
+  const rows = LEDGER.filter(r => r.po === po);
+  if (!rows.length) return null;
+
+  const consumption = rows.filter(r => r.type === 'Consumption');
+  const output = rows.filter(r => r.type === 'Output');
+  const rmItems = uniq(consumption.map(r => r.item));
+  const fgCodes = uniq(rows.map(r => r.fg).filter(Boolean));
+  const prodOrders = uniq(rows.filter(r => r.order.startsWith('REL_PO')).map(r => r.order));
+  const fgName = (output[0] || rows[0]).desc;
+  const dates = uniq(rows.map(r => r.date)).sort();
+
+  const rmRows = LEDGER.filter(r => rmItems.includes(r.item) && r.type !== 'Consumption');
+
+  const stages = [
+    { id: 'purchase', code: 'PURCHASE', name: 'Mua hàng · NCC', rows: rmRows.filter(r => r.type === 'Purchase') },
+    { id: 'wh_rw', code: 'WH_RW', name: 'Kho nguyên liệu', rows: rmRows.filter(r => r.loc === 'WH_RW') },
+    { id: 'wh_plan', code: 'WH_PLAN', name: 'Kho kế hoạch', rows: rmRows.filter(r => r.loc === 'WH_PLAN') },
+    { id: 'wh_prod_rm', code: 'WH_PROD', name: 'Kho sản xuất · NVL', rows: rmRows.filter(r => r.loc === 'WH_PROD') },
+    { id: 'prod', code: 'PROD', name: 'Sản xuất · tiêu hao & sản lượng', rows: consumption.concat(output) },
+    { id: 'wh_qc', code: 'WH_QC', name: 'Kho QC', rows: rows.filter(r => r.loc === 'WH_QC') },
+    { id: 'wh_fg', code: 'WH_FG', name: 'Kho thành phẩm', rows: rows.filter(r => r.loc === 'WH_FG') },
+    { id: 'sale', code: 'SALE', name: 'Xuất bán', rows: rows.filter(r => r.type === 'Sale') }
+  ];
+
+  // Khóa nối giữa các mắt xích — đúng theo sơ đồ mapping đã dựng trên dữ liệu NAV
+  const links = [
+    { key: 'Document No. + Item No.', type: 'direct' },
+    { key: 'Item No.', type: 'logic' },
+    { key: 'PLAN-PRO Order No. + Item No.', type: 'direct' },
+    { key: 'Production Order + PO Code + Item-FG', type: 'direct' },
+    { key: 'PRO-QC Order No. + Item No. + PO Code', type: 'direct' },
+    { key: 'QC-FG Order No. + Item No. + PO Code', type: 'direct' },
+    { key: 'chưa có bút toán Sales Shipment gắn PO', type: 'missing' }
+  ];
+
+  return { po, rows, consumption, output, rmItems, fgCodes, prodOrders, fgName, dates, stages, links };
+}
+
+function renderPo(po) {
+  const rec = buildPoRecord(po);
+  if (!rec) return renderNotFound(po, 'đơn hàng khách');
+  window.__REC = rec;
+
+  const outQty = rec.output.reduce((s, r) => s + (num(r.qty) || 0), 0);
+  const consQty = rec.consumption.reduce((s, r) => s + Math.abs(num(r.qty) || 0), 0);
+  const certified = rec.rmItems.filter(it => LEDGER.some(r => r.item === it && r.cert)).length;
+  const gaps = rec.stages.filter(s => !s.rows.length).length;
+
+  const html = `
+  <div class="crumb"><a href="?">Tra cứu</a> · Hồ sơ đơn hàng khách</div>
+
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Hồ sơ truy xuất · Đơn hàng khách hàng</div>
+      <h1 class="mono">${esc(rec.po)}</h1>
+      <div class="sub">${esc(rec.fgName)} · Mã thành phẩm <span class="code">${esc(rec.fgCodes.join(', '))}</span></div>
+      <div class="sub" style="margin-top:8px;color:var(--ink-3)">
+        Lệnh sản xuất <span class="code">${esc(rec.prodOrders.join(', ') || '—')}</span> ·
+        Ngày ghi sổ ${dmy(rec.dates[0])}${rec.dates.length > 1 ? ' – ' + dmy(rec.dates[rec.dates.length - 1]) : ''}
+      </div>
+    </div>
+    <div class="hero-right">
+      <div>
+        <div class="qr-box" id="qrBox"></div>
+        <div class="qr-cap">Quét để mở<br>hồ sơ này</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-strip">
+    <div class="st"><div class="num mono">${fmt(outQty)}</div><div class="lbl">Sản lượng Output</div></div>
+    <div class="st"><div class="num mono">${fmt(consQty)}</div><div class="lbl">Nguyên liệu tiêu hao</div></div>
+    <div class="st"><div class="num mono">${rec.rows.length}</div><div class="lbl">Bút toán gắn PO</div></div>
+    <div class="st ${gaps ? 'warn' : ''}"><div class="num mono">${gaps}</div><div class="lbl">Mắt xích thiếu dữ liệu</div></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Chuỗi hành trình sản phẩm</h2>
+      <span class="note">Bấm vào từng mắt xích để xem bút toán gốc</span></div>
+    <div class="tape">
+      ${rec.stages.map((s, i) => {
+        const lk = rec.links[i];
+        const last = i === rec.stages.length - 1;
+        const cls = [s.rows.length ? '' : 'empty', last ? 'last' : (lk ? lk.type : '')].join(' ');
+        const keyLine = last ? '' :
+          `<div class="vkey">↓ nối sang ${esc(rec.stages[i + 1].code)} bằng <b>${esc(lk.key)}</b>${
+            lk.type === 'logic' ? ' · liên kết logic' : lk.type === 'missing' ? ' · chưa có dữ liệu' : ''}</div>`;
+        return `<div class="vrow ${cls}" data-stage="${s.id}">
+          <div class="vrail"><span class="vdot"></span><span class="vline"></span></div>
+          <div class="vbody">
+            <div class="vhead"><span class="v-code">${esc(s.code)}</span>
+              <span class="v-name">${esc(s.name)}</span>
+              <span class="v-count">${s.rows.length ? s.rows.length + ' bút toán' : 'thiếu dữ liệu'}</span></div>
+            ${keyLine}
+          </div></div>`;
+      }).join('')}
+      <div class="legend">
+        <span><i></i> Nối trực tiếp bằng khóa dữ liệu</span>
+        <span><i class="logic"></i> Nối theo logic (chưa có khóa duy nhất)</span>
+        <span><i class="missing"></i> Thiếu dữ liệu trong NAV</span>
+      </div>
+    </div>
+    <div id="stageDetail" style="margin-top:16px"></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Lệnh sản xuất · tiêu hao và sản lượng</h2>
+      <span class="note">${esc(rec.prodOrders.join(', '))}</span></div>
+    <div class="tbl-cap"><div><div class="t">Nguyên liệu tiêu hao (Consumption)</div>
+      <div class="s">${rec.consumption.length} dòng · ${rec.rmItems.length} mã nguyên liệu · gắn Item-FG ${esc(rec.fgCodes.join(', '))}</div></div>
+      <span class="chip ink">Khóa: Production Order + PO Code + Item-FG</span></div>
+    ${ledgerTable(rec.consumption)}
+    <div class="tbl-cap" style="margin-top:22px"><div><div class="t">Thành phẩm nhập kho sản xuất (Output)</div>
+      <div class="s">${rec.output.length} lần ghi nhận · tổng ${fmt(rec.output.reduce((s, r) => s + (num(r.qty) || 0), 0))}</div></div></div>
+    ${ledgerTable(rec.output)}
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Nguyên liệu và khả năng truy ngược</h2>
+      <span class="note">${certified}/${rec.rmItems.length} mã có khai báo chứng nhận rừng trong ledger</span></div>
+    <div class="tbl-wrap" style="border-top:1px solid var(--line)"><table class="data">
+      <thead><tr><th>Mã nguyên liệu</th><th>Mô tả</th><th class="num">Tiêu hao</th>
+        <th>Chứng nhận rừng</th><th>Truy ngược lên phiếu nhập</th><th></th></tr></thead>
+      <tbody>${rec.rmItems.map(it => {
+        const cRows = rec.consumption.filter(r => r.item === it);
+        const q = cRows.reduce((s, r) => s + Math.abs(num(r.qty) || 0), 0);
+        const all = LEDGER.filter(r => r.item === it && r.type !== 'Consumption');
+        const purchase = all.filter(r => r.type === 'Purchase');
+        const cert = (LEDGER.find(r => r.item === it && r.cert) || {}).cert || '';
+        let status;
+        if (purchase.length) status = `<span class="chip pefc">Có ${purchase.length} phiếu nhập</span>`;
+        else if (all.length) status = `<span class="chip logic">Chỉ có ${all.length} bút toán điều chuyển</span>`;
+        else status = '<span class="chip gap">Không tìm thấy phiếu nhập</span>';
+        return `<tr>
+          <td><span class="code code-lnk" data-item="${esc(it)}">${esc(it)}</span></td>
+          <td style="max-width:340px">${dash(cRows[0].desc)}</td>
+          <td class="num">${fmt(q)}</td>
+          <td>${certChip(cert)}</td>
+          <td>${status}</td>
+          <td><span class="code code-lnk" data-item="${esc(it)}">Xem &rsaquo;</span></td>
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    <div class="callout" style="margin-top:16px">
+      <b>Khoảng trống then chốt:</b> ledger NAV hiện không có trường <span class="code">Roll No.</span> và
+      <span class="code">Bill of Lading No.</span>, nên từ dòng tiêu hao chỉ truy ngược được tới <b>mã nguyên liệu</b>,
+      chưa xác định được <b>đúng cuộn giấy vật lý</b> đã dùng cho lô thành phẩm này. Đây là trường cần bổ sung
+      để hồ sơ EUDR/DDS đứng vững khi khách EU hoặc kiểm toán BRCGS truy vấn.
+    </div>
+  </div>
+
+  ${renderDdsSection(rec)}
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Xác thực dữ liệu và khoảng trống</h2></div>
+    ${renderChecks(rec)}
+  </div>
+
+  <div class="footer">
+    <div><div class="t">Hồ sơ truy xuất nguồn gốc · ${esc(PRODUCER.name)}</div>
+      <div class="s">${esc(PRODUCER.role)} · Dữ liệu vận hành từ ${esc(PRODUCER.erp)}</div></div>
+    <div class="r">Nguồn dữ liệu: Item Ledger Entries + Biểu mẫu DDS nhà cung cấp<br>Bản demo dựng cho buổi làm việc Go-Pak × Base</div>
+  </div>`;
+
+  $('recordBody').innerHTML = html;
+  document.title = rec.po + ' · Truy xuất nguồn gốc Go-Pak';
+  bindItemLinks($('recordBody'));
+  document.querySelectorAll('.vrow').forEach(n => n.addEventListener('click', () => showStage(n.getAttribute('data-stage'))));
+  showStage('wh_fg');
+  renderQr(location.origin + location.pathname + '?po=' + encodeURIComponent(rec.po));
+  initMap();
+}
+
+function showStage(id) {
+  const rec = window.__REC;
+  const st = rec.stages.find(s => s.id === id);
+  document.querySelectorAll('.vrow').forEach(n => n.classList.toggle('active', n.getAttribute('data-stage') === id));
+  const note = {
+    purchase: 'Phiếu nhập mua của các mã nguyên liệu đã tiêu hao cho đơn hàng này (khóa: Document No. + Item No.).',
+    wh_rw: 'Tồn/biến động tại kho nguyên liệu của các mã đã tiêu hao — nối với bước sau chỉ bằng Item No.',
+    wh_plan: 'Nguyên liệu tại kho kế hoạch, điều chuyển qua lệnh PLAN-PRO / PRO-PLAN.',
+    wh_prod_rm: 'Nguyên liệu đã chuyển vào kho sản xuất trước khi tiêu hao.',
+    prod: 'Tiêu hao nguyên liệu và ghi nhận sản lượng theo lệnh sản xuất, gắn PO khách và Item-FG.',
+    wh_qc: 'Thành phẩm nhập kho QC theo lệnh PRO-QC.',
+    wh_fg: 'Thành phẩm nhập kho thành phẩm theo lệnh QC-FG, sẵn sàng giao hàng.',
+    sale: 'Bút toán xuất bán gắn PO khách — chưa có trong dữ liệu được cung cấp.'
+  }[id] || '';
+  const gapNote = st.rows.length ? '' :
+    `<div class="callout" style="border-top:none">Không có bút toán nào cho mắt xích <b>${esc(st.code)}</b> trong dữ liệu hiện có,
+      nên chuỗi đang bị đứt tại đây.</div>`;
+  $('stageDetail').innerHTML = `
+    <div class="tbl-cap"><div><div class="t">${esc(st.code)} · ${esc(st.name)}</div><div class="s">${esc(note)}</div></div>
+      <span class="chip ${st.rows.length ? 'ink' : 'gap'}">${st.rows.length} bút toán</span></div>
+    ${st.rows.length ? ledgerTable(st.rows) : gapNote}`;
+  bindItemLinks($('stageDetail'));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HỒ SƠ DDS THƯỢNG NGUỒN
+   ══════════════════════════════════════════════════════════════ */
+// Nối nguyên liệu trong NAV với hồ sơ DDS: hiện chỉ khớp được theo mô tả
+// nguyên liệu (KP275 / PKP275), chưa có khóa duy nhất → luôn gắn nhãn "logic".
+function matchDds(itemNo, desc) {
+  const d = (desc || '').toUpperCase();
+  return DDS_LIST.filter(x => {
+    const tokens = (x.material_item + ' ' + x.material_name).toUpperCase();
+    if (d.includes('KP275') && tokens.includes('KP275')) return true;
+    return false;
+  });
+}
+
+function ddsRelatedItems(dds) {
+  return uniq(LEDGER.filter(r => (r.desc || '').toUpperCase().includes('KP275')).map(r => r.item));
+}
+
+function renderDdsSection(rec) {
+  // DDS khớp với các mã nguyên liệu của đơn hàng này
+  const matched = [];
+  rec.rmItems.forEach(it => {
+    const row = rec.consumption.find(r => r.item === it);
+    matchDds(it, row && row.desc).forEach(d => { if (!matched.includes(d)) matched.push(d); });
+  });
+  if (!matched.length) {
+    const ref = DDS_LIST[0];
+    return `<div class="section">
+      <div class="sec-head"><span class="sec-num">04</span><h2>Hồ sơ DDS nhà cung cấp</h2>
+        <span class="note">Chưa nối được với đơn hàng này</span></div>
+      <div class="callout">Không ghép được hồ sơ DDS nào cho ${rec.rmItems.length} mã nguyên liệu của đơn hàng này.
+        Biểu mẫu DDS hiện có lập theo <b>đơn mua của nhà cung cấp</b> (<span class="code">${esc(ref.material_item)} · PO ${esc(ref.po_number)}</span>),
+        còn ledger NAV ghi theo <b>Item No.</b> — không có trường nối chung (Roll No., B/L No. hoặc mã DDS trên phiếu nhập)
+        nên chuỗi đang đứt ở đúng chỗ quan trọng nhất với EUDR: từ nguyên liệu ngược lên khu rừng.</div>
+      <div class="tbl-cap" style="margin-top:16px"><div><div class="t">Hồ sơ DDS đang có trong hệ thống</div>
+        <div class="s">${esc(ref.material_name.split('/')[0].trim())}</div></div>
+        <a class="chip ink" href="?dds=${encodeURIComponent(ref.po_number)}">Xem hồ sơ đầy đủ &rsaquo;</a></div>
+      <div style="border:1px solid var(--line);border-top:none;padding:16px 16px 4px">${ddsChainHtml(ref)}</div>
+    </div>`;
+  }
+  return `<div class="section">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Hồ sơ DDS nhà cung cấp</h2>
+      <span class="note">Khớp theo mô tả nguyên liệu — liên kết logic</span></div>
+    ${matched.map(d => ddsChainHtml(d)).join('')}
+  </div>`;
+}
+
+function ddsChainHtml(d) {
+  return d.lines.map(l => `
+    <div class="dds-chain" style="margin-bottom:14px">
+      <div class="dds-step"><div class="k">Nhà bán hàng</div>
+        <div class="v">${dash(l.seller.brand)}</div>
+        <div class="m">Mã NCC ${dash(l.seller.code)}<br>${dash(l.seller.type)} · ${dash(l.seller.cert)}</div></div>
+      <div class="dds-step"><div class="k">Nhà máy giấy</div>
+        <div class="v">${dash(l.mill.name)}</div>
+        <div class="m">${dash(l.mill.country)} · ${dash(l.mill.claim)}<br>Rủi ro quốc gia: ${dash(l.mill.risk)}</div></div>
+      <div class="dds-step"><div class="k">Nhà máy bột giấy</div>
+        <div class="v">${dash(l.pulp.pulp_supplier)}</div>
+        <div class="m">${dash(l.pulp.pulp_type)} · ${dash(l.pulp.country)}<br>NCC: ${dash(l.pulp.supplier)}</div></div>
+      <div class="dds-step"><div class="k">Khu rừng</div>
+        <div class="v">${l.forests.map(f => esc(f.owner)).join(' · ')}</div>
+        <div class="m">${l.forests.map(f => esc(f.country)).join(' · ')} · ${l.forests.length} nguồn<br>
+          <a class="code-lnk" href="?dds=${encodeURIComponent(d.po_number)}">Xem hồ sơ DDS đầy đủ &rsaquo;</a></div></div>
+    </div>`).join('');
+}
+
+function renderChecks(rec) {
+  const has = id => rec.stages.find(s => s.id === id).rows.length;
+  const items = [
+    { ok: !!rec.prodOrders.length, t: 'Thành phẩm ↔ lệnh sản xuất', s: `Nối qua Order No. ${esc(rec.prodOrders.join(', '))} và Item-FG ${esc(rec.fgCodes.join(', '))}.` },
+    { ok: true, t: 'Đơn hàng khách ↔ thành phẩm', s: `${rec.rows.length} bút toán mang Po_no Code ${esc(rec.po)}.` },
+    { ok: !!rec.consumption.length, t: 'Lệnh sản xuất ↔ nguyên liệu tiêu hao', s: `${rec.consumption.length} dòng Consumption, ${rec.rmItems.length} mã nguyên liệu.` },
+    { ok: !!has('wh_qc') && !!has('wh_fg'), t: 'Thành phẩm ↔ kho QC ↔ kho FG', s: `Nối qua lệnh PRO-QC và QC-FG cùng PO Code.` },
+    { state: 'fail', t: 'Nguyên liệu ↔ cuộn giấy vật lý', s: 'Ledger không có trường Roll No. / Bill of Lading No. nên không xác định được đúng cuộn đã dùng.' },
+    { state: 'fail', t: 'Thành phẩm ↔ xuất bán cho khách', s: 'Không có bút toán Sales Shipment gắn PO trong dữ liệu được cung cấp.' },
+    { state: 'partial', t: 'Nguyên liệu ↔ hồ sơ DDS', s: 'Chỉ ghép được theo mô tả nguyên liệu (KP275), chưa có khóa duy nhất giữa phiếu nhập và mã DDS.' }
+  ];
+  return `<div class="check-grid">${items.map(i => {
+    const cls = i.state === 'fail' ? 'fail' : i.state === 'partial' ? 'partial' : (i.ok ? '' : 'fail');
+    const mark = cls === 'fail' ? '✕' : cls === 'partial' ? '~' : '✓';
+    return `<div class="check ${cls}"><span class="mark">${mark}</span>
+      <div><div class="t">${esc(i.t)}</div><div class="s">${i.s}</div></div></div>`;
+  }).join('')}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HỒ SƠ NGUYÊN LIỆU (ITEM)
+   ══════════════════════════════════════════════════════════════ */
+function renderItem(item) {
+  const rows = LEDGER.filter(r => r.item === item);
+  if (!rows.length) return renderNotFound(item, 'nguyên liệu');
+  const desc = (rows.find(r => r.desc) || {}).desc || '';
+  const cert = (rows.find(r => r.cert) || {}).cert || '';
+  const inQty = rows.filter(r => (num(r.qty) || 0) > 0).reduce((s, r) => s + num(r.qty), 0);
+  const outQty = rows.filter(r => (num(r.qty) || 0) < 0).reduce((s, r) => s + Math.abs(num(r.qty)), 0);
+  const purchases = rows.filter(r => r.type === 'Purchase');
+  const usedIn = uniq(rows.filter(r => r.type === 'Consumption' && r.po && r.po !== '0000000').map(r => r.po));
+  const dds = matchDds(item, desc);
+
+  const byLoc = {};
+  rows.forEach(r => { (byLoc[r.loc] = byLoc[r.loc] || []).push(r); });
+
+  $('recordBody').innerHTML = `
+  <div class="crumb"><a href="?">Tra cứu</a> · Hồ sơ nguyên liệu</div>
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Nguyên liệu đầu vào</div>
+      <h1 class="mono">${esc(item)}</h1>
+      <div class="sub" style="max-width:620px">${dash(desc)}</div>
+      <div class="sub" style="margin-top:10px">${certChip(cert)}
+        ${dds.length ? `<span class="chip logic" style="margin-left:6px">Khớp hồ sơ DDS ${esc(dds[0].material_item)}</span>`
+        : '<span class="chip gap" style="margin-left:6px">Chưa nối được hồ sơ DDS</span>'}</div>
+    </div>
+  </div>
+  <div class="stat-strip">
+    <div class="st"><div class="num mono">${rows.length}</div><div class="lbl">Bút toán</div></div>
+    <div class="st"><div class="num mono">${fmt(inQty)}</div><div class="lbl">Tổng ghi tăng</div></div>
+    <div class="st"><div class="num mono">${fmt(outQty)}</div><div class="lbl">Tổng ghi giảm</div></div>
+    <div class="st ${purchases.length ? '' : 'warn'}"><div class="num mono">${purchases.length}</div><div class="lbl">Phiếu nhập mua</div></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Phân bổ theo kho</h2></div>
+    <div class="check-grid">${Object.keys(byLoc).map(loc => `
+      <div class="check"><span class="mark" style="background:var(--ink)">${byLoc[loc].length}</span>
+        <div><div class="t mono">${esc(loc)}</div>
+          <div class="s">Ròng: ${fmt(byLoc[loc].reduce((s, r) => s + (num(r.qty) || 0), 0))}</div></div></div>`).join('')}
+    </div>
+  </div>
+
+  ${usedIn.length ? `<div class="section">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Đã dùng cho đơn hàng khách</h2></div>
+    <div class="check-grid">${usedIn.map(p => `<div class="check"><span class="mark">→</span>
+      <div><div class="t mono"><a class="code-lnk" href="?po=${encodeURIComponent(p)}">${esc(p)}</a></div>
+      <div class="s">Bấm để mở hồ sơ truy xuất của đơn hàng</div></div></div>`).join('')}</div>
+  </div>` : ''}
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">${usedIn.length ? '03' : '02'}</span><h2>Toàn bộ bút toán của mã nguyên liệu</h2></div>
+    <div class="tbl-cap"><div><div class="t">Item Ledger Entries</div>
+      <div class="s">${rows.length} dòng, sắp theo Entry No.</div></div></div>
+    ${ledgerTable(rows)}
+  </div>
+
+  ${dds.length ? `<div class="section">
+    <div class="sec-head"><span class="sec-num">${usedIn.length ? '04' : '03'}</span><h2>Hồ sơ DDS thượng nguồn</h2>
+      <span class="note">Khớp theo mô tả nguyên liệu — liên kết logic</span></div>
+    ${ddsChainHtml(dds[0])}
+  </div>` : `<div class="section">
+    <div class="sec-head"><span class="sec-num">${usedIn.length ? '04' : '03'}</span><h2>Hồ sơ DDS thượng nguồn</h2></div>
+    <div class="callout">Không tìm thấy hồ sơ DDS cho mã nguyên liệu này trong bộ dữ liệu được cung cấp
+      (hiện chỉ có 1 biểu mẫu DDS: <a class="code-lnk" href="?dds=2607057">PKP275 · PO 2607057</a>).</div>
+  </div>`}
+
+  <div class="footer"><div><div class="t">Hồ sơ nguyên liệu · ${esc(PRODUCER.name)}</div>
+    <div class="s">Dữ liệu từ Item Ledger Entries — ${esc(PRODUCER.erp)}</div></div></div>`;
+
+  document.title = item + ' · Nguyên liệu · Go-Pak';
+  bindItemLinks($('recordBody'));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HỒ SƠ DDS
+   ══════════════════════════════════════════════════════════════ */
+function renderDds(code) {
+  const d = DDS_LIST.find(x => x.po_number === code || x.material_item.toUpperCase() === String(code).toUpperCase());
+  if (!d) return renderNotFound(code, 'hồ sơ DDS');
+  const forests = [];
+  d.lines.forEach(l => l.forests.forEach(f => forests.push({ f, l })));
+  const items = ddsRelatedItems(d);
+
+  $('recordBody').innerHTML = `
+  <div class="crumb"><a href="?">Tra cứu</a> · Hồ sơ DDS nhà cung cấp</div>
+  <div class="hero">
+    <div>
+      <div class="eyebrow">${esc(d.title)} · ${esc(d.doc_no)}</div>
+      <h1 class="mono">PO ${esc(d.po_number)}</h1>
+      <div class="sub">Mã nguyên liệu <span class="code">${esc(d.material_item)}</span> · ${esc(d.material_type)}</div>
+      <div class="sub" style="margin-top:8px;color:var(--ink-3);max-width:660px">${esc(d.material_name)}</div>
+    </div>
+  </div>
+  <div class="stat-strip">
+    <div class="st"><div class="num mono">${fmt(d.lines.reduce((s, l) => s + (num(l.order_qty) || 0), 0))}</div><div class="lbl">Số lượng đặt (kg)</div></div>
+    <div class="st"><div class="num mono">${fmt(d.lines.reduce((s, l) => s + (num(l.received_qty) || 0), 0))}</div><div class="lbl">Số lượng nhận (kg)</div></div>
+    <div class="st"><div class="num mono">${d.lines.length}</div><div class="lbl">Nguồn bột giấy</div></div>
+    <div class="st"><div class="num mono">${forests.length}</div><div class="lbl">Khu rừng nguồn gốc</div></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Thông tin đơn hàng mua</h2></div>
+    <div class="card card-pad grid-3">
+      <div class="field"><div class="lbl">Ngày đặt hàng</div><div class="val mono">${dmy(d.order_date)}</div></div>
+      <div class="field"><div class="lbl">Ngày nhập</div><div class="val mono">${dash(d.receiving_date)}</div></div>
+      <div class="field"><div class="lbl">Số hóa đơn</div><div class="val mono">${dash(d.invoice_no)}</div></div>
+      <div class="field"><div class="lbl">Số packing list</div><div class="val mono">${dash(d.packing_list)}</div></div>
+      <div class="field"><div class="lbl">Loại nguyên liệu</div><div class="val">${dash(d.material_type)}</div></div>
+      <div class="field"><div class="lbl">Phê duyệt</div><div class="val">${dash(d.approved_by)}</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Chuỗi hành trình thượng nguồn</h2>
+      <span class="note">Nhà bán hàng → nhà máy giấy → nhà máy bột giấy → khu rừng</span></div>
+    ${d.lines.map(l => `
+      <div class="tbl-cap" style="margin-top:14px"><div><div class="t">Nguồn ${l.line} · ${esc(l.pulp.country)}</div>
+        <div class="s">Đặt ${fmt(l.order_qty)} kg · Nhận ${fmt(l.received_qty)} kg · ${esc(l.mill.claim)}</div></div>
+        <span class="chip ${l.pulp.risk.toLowerCase().includes('low') ? 'pefc' : 'fsc'}">Rủi ro: ${esc(l.pulp.risk)}</span></div>
+      ${ddsChainHtml({ ...d, lines: [l] })}
+    `).join('')}
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Khu rừng nguồn gốc</h2>
+      <span class="note">${forests.length} khu rừng · toàn bộ là rừng trồng có chứng nhận PEFC</span></div>
+    <div class="card">
+      <div class="map-note">Bản đồ đang hiển thị vị trí tham chiếu ở cấp quốc gia. Biểu mẫu DDS mới ghi tên file bản đồ
+        (${esc(forests.map(x => x.f.map).join(' · '))}) — chưa có file GeoJSON ranh giới thửa rừng nên chưa vẽ được polygon.</div>
+      <div id="map"></div>
+    </div>
+    <div class="tbl-wrap" style="border-top:none;margin-top:0"><table class="data">
+      <thead><tr><th>Chủ rừng</th><th>Quốc gia</th><th>Loài cây</th><th>Loại rừng</th>
+        <th>Chứng nhận</th><th>Kỳ khai thác</th><th>Rủi ro</th></tr></thead>
+      <tbody>${forests.map(({ f }) => `<tr>
+        <td><b>${dash(f.owner)}</b></td>
+        <td>${dash(f.country)}</td>
+        <td>${dash(f.scientific)}<div style="font-size:10.5px;color:var(--ink-3);margin-top:2px">${dash(f.common)}</div></td>
+        <td>${dash(f.owner_type)}</td>
+        <td>${certChip(f.type)}<div class="code" style="font-size:10.5px;margin-top:4px">${dash(f.cert)}</div></td>
+        <td class="mono">${dmy(f.start)} – ${dmy(f.end)}</td>
+        <td>${dash(f.risk)}</td></tr>`).join('')}</tbody></table></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Nguyên liệu trong NAV khớp với hồ sơ này</h2>
+      <span class="note">Khớp theo mô tả (KP275) — liên kết logic, chưa có khóa duy nhất</span></div>
+    ${items.length ? `<div class="check-grid">${items.map(it => {
+      const r = LEDGER.find(x => x.item === it);
+      return `<div class="check partial"><span class="mark">~</span>
+        <div><div class="t mono"><a class="code-lnk" href="?item=${encodeURIComponent(it)}">${esc(it)}</a></div>
+        <div class="s">${dash(r.desc)}</div></div></div>`;
+    }).join('')}</div>` : '<div class="callout">Không tìm thấy mã nguyên liệu tương ứng trong ledger.</div>'}
+    <div class="callout" style="margin-top:16px">
+      <b>Điểm cần bổ sung:</b> biểu mẫu DDS lập theo đơn mua của nhà cung cấp (PO ${esc(d.po_number)}, hóa đơn ${esc(d.invoice_no)}),
+      còn NAV ghi nhận theo Item No. và Document No. của phiếu nhập. Muốn nối tự động DDS ↔ lô nguyên liệu ↔ thành phẩm,
+      cần đưa <span class="code">Roll No.</span>, <span class="code">B/L No.</span> và <span class="code">mã DDS</span>
+      vào phiếu nhập kho nguyên liệu.
+    </div>
+  </div>
+
+  <div class="footer"><div><div class="t">Hồ sơ DDS · ${esc(d.doc_no)}</div>
+    <div class="s">Nguồn: biểu mẫu SOURCE OF FROM SUPPLIER do Go-Pak cung cấp</div></div></div>`;
+
+  document.title = 'DDS ' + d.po_number + ' · Go-Pak';
+  window.__FORESTS = forests;
+  initMap();
+}
+
+let map;
+function initMap() {
+  const el = $('map');
+  if (!el || !window.L) return;
+  const forests = window.__FORESTS || [];
+  if (!forests.length) return;
+  map = L.map('map', { scrollWheelZoom: false }).setView([-10, 140], 3);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Tiles &copy; Esri', maxZoom: 12 }).addTo(map);
+  const layers = [];
+  forests.forEach(({ f }) => {
+    if (typeof f.lat !== 'number') return;
+    const m = L.circleMarker([f.lat, f.lng], { radius: 9, color: '#e4002b', weight: 2, fillColor: '#e4002b', fillOpacity: .55 })
+      .bindPopup(`<b>${esc(f.owner)}</b><br>${esc(f.country)} · ${esc(f.owner_type)}<br>${esc(f.scientific)}<br>
+        <i>Vị trí tham chiếu cấp quốc gia — chưa có GeoJSON thửa rừng</i>`)
+      .addTo(map);
+    layers.push(m);
+  });
+  if (layers.length) map.fitBounds(L.featureGroup(layers).getBounds().pad(0.6));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CÁC TRẠNG THÁI KHÁC
+   ══════════════════════════════════════════════════════════════ */
+function renderRoll(code) {
+  $('recordBody').innerHTML = `
+  <div class="crumb"><a href="?">Tra cứu</a> · Tra theo mã cuộn</div>
+  <div class="hero" style="border-left-color:var(--red)">
+    <div>
+      <div class="eyebrow" style="color:var(--red)">Trường dữ liệu chưa tồn tại</div>
+      <h1 class="mono">${esc(code || 'Roll No.')}</h1>
+      <div class="sub" style="max-width:640px">Ledger NAV hiện tại không có trường <span class="code">Roll No.</span>
+        hay <span class="code">Bill of Lading No.</span> nên chưa tra cứu được theo cuộn giấy vật lý.</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Cần bổ sung gì để tra được theo cuộn</h2></div>
+    <div class="check-grid">
+      <div class="check fail"><span class="mark">✕</span><div><div class="t">Roll No. trên phiếu nhập kho</div>
+        <div class="s">Mỗi cuộn giấy cần một mã định danh ghi ngay tại bước Purchase → WH_RW.</div></div></div>
+      <div class="check fail"><span class="mark">✕</span><div><div class="t">Bill of Lading / Shipment No.</div>
+        <div class="s">Khóa nối cuộn giấy với hồ sơ DDS của nhà cung cấp (1 B/L có thể ứng nhiều mã nguyên liệu).</div></div></div>
+      <div class="check fail"><span class="mark">✕</span><div><div class="t">Mã DDS trên phiếu nhập</div>
+        <div class="s">Để mỗi lô nguyên liệu trỏ thẳng về đúng hồ sơ DDS thay vì ghép theo mô tả.</div></div></div>
+      <div class="check partial"><span class="mark">~</span><div><div class="t">Bin Location</div>
+        <div class="s">Đã có Location Code cấp kho, chưa có vị trí racking để phân biệt cuộn cùng mã.</div></div></div>
+      <div class="check fail"><span class="mark">✕</span><div><div class="t">Sales Shipment gắn PO</div>
+        <div class="s">Để khép chuỗi từ kho thành phẩm tới đơn hàng khách EU.</div></div></div>
+      <div class="check"><span class="mark">✓</span><div><div class="t">PO Code, Item-FG, Order No.</div>
+        <div class="s">Đã có sẵn — đủ để nối từ nguyên liệu vào sản xuất và ra thành phẩm.</div></div></div>
+    </div>
+    <div class="callout" style="margin-top:16px">Khi 3 trường đầu được ghi nhận, chuỗi
+      <b>Thành phẩm → Lệnh sản xuất → Nguyên liệu → Roll No. → B/L → Nhà cung cấp → DDS</b> sẽ chạy được hai chiều
+      đúng như mục tiêu chốt trong buổi làm việc ngày 25/08/2026.</div>
+  </div>
+  <div class="footer"><div><div class="t">Phân tích khoảng trống dữ liệu</div>
+    <div class="s">Dựa trên Item Ledger Entries do Go-Pak cung cấp</div></div></div>`;
+  document.title = 'Roll No. · Go-Pak';
+}
+
+function renderNotFound(code, kind) {
+  $('recordBody').innerHTML = `
+  <div class="crumb"><a href="?">Tra cứu</a> · Không tìm thấy</div>
+  <div class="hero" style="border-left-color:var(--red)">
+    <div><div class="eyebrow" style="color:var(--red)">Không tìm thấy</div>
+      <h1 class="mono">${esc(code || '')}</h1>
+      <div class="sub">Không có ${esc(kind)} nào mang mã này trong bộ dữ liệu được cung cấp.</div>
+      <div class="sub" style="margin-top:12px">Thử: <a class="code-lnk" href="?po=PO035999">PO035999</a> ·
+        <a class="code-lnk" href="?item=80103-015.02">80103-015.02</a> ·
+        <a class="code-lnk" href="?dds=2607057">DDS 2607057</a></div>
+    </div>
+  </div>`;
+  document.title = 'Không tìm thấy · Go-Pak';
+}
+
+function renderQr(text) {
+  const box = $('qrBox');
+  if (!box || typeof QRCode !== 'function') return;
+  box.innerHTML = '';
+  new QRCode(box, { text, width: 92, height: 92, correctLevel: QRCode.CorrectLevel.M });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TRANG TRA CỨU + ĐIỀU HƯỚNG
+   ══════════════════════════════════════════════════════════════ */
+const MODES = {
+  po: { ph: 'VD: PO035999', hint: 'Ví dụ: <b data-fill="PO035999">PO035999</b>' },
+  fg: { ph: 'VD: D43033', hint: 'Ví dụ: <b data-fill="D43033">D43033</b>' },
+  item: { ph: 'VD: 80103-015.02', hint: 'Ví dụ: <b data-fill="80103-015.02">80103-015.02</b> · <b data-fill="80101-016.01">80101-016.01</b> · <b data-fill="80107-001.02">80107-001.02</b>' },
+  dds: { ph: 'VD: 2607057', hint: 'Ví dụ: <b data-fill="2607057">2607057</b> · <b data-fill="PKP275">PKP275</b>' },
+  roll: { ph: 'VD: RM1 / 260101', hint: 'Trường Roll No. chưa có trong ledger NAV — tra cứu sẽ hiển thị phân tích khoảng trống.' }
+};
+let mode = 'po';
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-mode') === m));
+  $('searchInput').placeholder = MODES[m].ph;
+  $('searchHint').innerHTML = MODES[m].hint;
+  $('searchInput').value = '';
+  $('searchInput').focus();
+  $('searchHint').querySelectorAll('[data-fill]').forEach(b =>
+    b.addEventListener('click', () => { $('searchInput').value = b.getAttribute('data-fill'); submitSearch(); }));
+}
+
+function submitSearch() {
+  const raw = $('searchInput').value.trim();
+  if (!raw) return;
+  if (mode === 'roll') return go({ roll: raw });
+  if (mode === 'dds') return go({ dds: raw });
+  if (mode === 'item') return go({ item: raw });
+  if (mode === 'fg') return go({ fg: raw.toUpperCase() });
+  go({ po: raw.toUpperCase() });
+}
+
+function initSearchPage() {
+  document.querySelectorAll('.mode-btn').forEach(b =>
+    b.addEventListener('click', () => setMode(b.getAttribute('data-mode'))));
+  $('searchForm').addEventListener('submit', e => { e.preventDefault(); submitSearch(); });
+  setMode('po');
+}
+
+function initTopSearch() {
+  const run = () => {
+    const raw = $('topSearch').value.trim();
+    if (!raw) return;
+    if (/^PO\d+/i.test(raw)) return go({ po: raw.toUpperCase() });
+    if (LEDGER.some(r => r.item === raw)) return go({ item: raw });
+    if (LEDGER.some(r => r.fg === raw.toUpperCase())) return go({ fg: raw.toUpperCase() });
+    if (DDS_LIST.some(d => d.po_number === raw || d.material_item.toUpperCase() === raw.toUpperCase())) return go({ dds: raw });
+    go({ po: raw.toUpperCase() });
+  };
+  $('topSearchBtn').addEventListener('click', run);
+  $('topSearch').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+}
+
+(function router() {
+  const qs = new URLSearchParams(location.search);
+  const po = qs.get('po'), fg = qs.get('fg'), item = qs.get('item'), dds = qs.get('dds'), roll = qs.get('roll');
+  if (!po && !fg && !item && !dds && !roll) {
+    $('page-search').classList.add('active');
+    initSearchPage();
+    return;
+  }
+  $('page-record').classList.add('active');
+  initTopSearch();
+  if (po) return renderPo(po);
+  if (fg) {
+    const pos = uniq(LEDGER.filter(r => r.fg === fg && r.po && r.po !== '0000000').map(r => r.po));
+    if (pos.length === 1) return renderPo(pos[0]);
+    if (!pos.length) return renderNotFound(fg, 'thành phẩm gắn đơn hàng');
+    $('recordBody').innerHTML = `<div class="section"><div class="sec-head"><span class="sec-num">01</span>
+      <h2>Thành phẩm ${esc(fg)} thuộc ${pos.length} đơn hàng</h2></div>
+      <div class="check-grid">${pos.map(p => `<div class="check"><span class="mark">→</span>
+        <div><div class="t mono"><a class="code-lnk" href="?po=${encodeURIComponent(p)}">${esc(p)}</a></div></div></div>`).join('')}</div></div>`;
+    return;
+  }
+  if (item) return renderItem(item);
+  if (dds) return renderDds(dds);
+  if (roll) return renderRoll(roll);
+})();
+
+</script>
+</body>
+</html>
