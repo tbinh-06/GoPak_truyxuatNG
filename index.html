@@ -224,10 +224,14 @@ table.forest-table .sub-line{font-size:10px;}
 .legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);flex-wrap:wrap;}
 .legend span{display:inline-flex;align-items:center;gap:6px;}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--brand);display:inline-block;}
+.zoom-btn{background:#fff;border:1px solid var(--border);color:var(--muted);font-size:11.5px;font-weight:600;
+  padding:5px 11px;border-radius:20px;cursor:pointer;font-family:"Inter";}
+.zoom-btn:hover{background:var(--green-bg);color:var(--brand-dark);border-color:var(--brand);}
+.leaflet-tooltip{font-size:11.5px;font-weight:600;}
 .map-status{padding:9px 20px;font-size:12px;border-bottom:1px solid var(--border);}
 .map-status.ref{color:var(--amber);background:var(--amber-bg);}
 .map-status.exact{color:var(--brand-dark);background:var(--green-bg);}
-#map{height:340px;width:100%;}
+#map{height:420px;width:100%;}
 .leaflet-popup-content{font-size:12.5px;line-height:1.5;}
 
 /* ══ TỔNG + XÁC THỰC ══ */
@@ -368,7 +372,7 @@ const I18N = {
     map_exact: 'Toạ độ vùng trồng lấy từ hồ sơ.',
     map_ref: 'Hồ sơ chưa có cột Latitude / Longitude — điểm đang đặt ở mức quốc gia để tham chiếu. Bổ sung 2 cột toạ độ (hoặc cột GeoJSON ranh giới) vào sheet là bản đồ hiện đúng vị trí thửa.',
     map_ref_note: 'Vị trí tham chiếu cấp quốc gia', map_harvest: 'Khai thác',
-    map_demo: 'Toạ độ và ranh giới vùng trồng theo hồ sơ (dữ liệu demo).', demo_note: 'Ranh giới demo',
+    map_demo: 'Toạ độ và ranh giới vùng trồng theo hồ sơ (dữ liệu demo). Bấm tên quốc gia để phóng to xem ranh giới thửa.', demo_note: 'Ranh giới demo', zoom_all: '↺ Xem toàn bộ',
     sec4: 'Danh sách khu rừng', sec4_sub: 'dòng nguồn trong hồ sơ',
     th_coord: 'Toạ độ', no_coord: 'chưa có', n_rows: 'dòng nguồn',
     tot_forest: 'Tổng chủ rừng', tot_country: 'Quốc gia khai thác', tot_cert: 'Rừng trồng có chứng nhận',
@@ -434,7 +438,7 @@ const I18N = {
     map_exact: 'Plantation coordinates taken from the file.',
     map_ref: 'The file has no Latitude / Longitude columns — markers are placed at country level for reference. Add the two coordinate columns (or a GeoJSON boundary column) and the map will show the exact plots.',
     map_ref_note: 'Country-level reference position', map_harvest: 'Harvest',
-    map_demo: 'Plantation coordinates and boundaries from the file (demo data).', demo_note: 'Demo boundary',
+    map_demo: 'Plantation coordinates and boundaries from the file (demo data). Click a country to zoom in on the plot boundaries.', demo_note: 'Demo boundary', zoom_all: '↺ View all',
     sec4: 'Forest list', sec4_sub: 'source rows in the file',
     th_coord: 'Coordinates', no_coord: 'not provided', n_rows: 'source rows',
     tot_forest: 'Forest suppliers', tot_country: 'Countries of harvest', tot_cert: 'Certified plantations',
@@ -694,7 +698,7 @@ function renderRecord(code) {
     </div>
     <div class="map-card">
       <div class="map-head"><h3>${T.map_head}</h3>
-        <div class="legend"><span><span class="dot"></span> ${T.legend}</span></div></div>
+        <div class="legend" id="mapLegend"></div></div>
       ${mapStatus(fg)}
       <div id="map"></div>
     </div>
@@ -883,7 +887,7 @@ function verifyGrid(p, fg) {
 }
 
 /* ── Bản đồ ── */
-let map;
+let map, MAP_GROUPS = {};
 function drawMap() {
   const pts = MAPF.filter(f => typeof f.lat === 'number' && typeof f.lng === 'number');
   if (!pts.length || !window.L || !$('map')) return;
@@ -891,26 +895,65 @@ function drawMap() {
   map = L.map('map', { scrollWheelZoom: false });
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     { attribution: 'Tiles &copy; Esri', maxZoom: 16 }).addTo(map);
-  const layers = [], seen = {};
+
+  const polys = L.layerGroup().addTo(map);   // ranh giới thửa — chỉ rõ khi phóng to
+  const pins = L.layerGroup().addTo(map);    // điểm đánh dấu — luôn thấy ở mọi mức zoom
+  const bounds = [];
+  MAP_GROUPS = {};
+
   pts.forEach(f => {
     const popup = `<b>${esc(f.supplier)}</b><br>${esc(f.country || '')}${f.place ? ' · ' + esc(f.place) : ''}<br>
       ${esc(f.sci || '')}<br>${esc(f.fm_type || '')} ${esc(f.fm_no || '')}<br>
-      ${T.map_harvest}: ${dmy(f.start)} – ${dmy(f.end)}` + (f.coord_src === 'country' ? `<br><i>${T.map_ref_note}</i>` : f.coord_src === 'demo' ? `<br><i>${T.demo_note}</i>` : '');
+      ${T.map_harvest}: ${dmy(f.start)} – ${dmy(f.end)}` +
+      (f.coord_src === 'country' ? `<br><i>${T.map_ref_note}</i>` : f.coord_src === 'demo' ? `<br><i>${T.demo_note}</i>` : '');
+    let center = [f.lat, f.lng];
     if (f.geojson) {
       try {
-        layers.push(L.geoJSON(JSON.parse(f.geojson),
-          { style: { color: '#3f7440', weight: 2, fillColor: '#529351', fillOpacity: .35 } })
-          .bindPopup(popup).addTo(map));
-        return;
-      } catch (e) { /* sai định dạng -> vẽ điểm */ }
+        const gl = L.geoJSON(JSON.parse(f.geojson),
+          { style: { color: '#3f7440', weight: 2, fillColor: '#529351', fillOpacity: .45 } }).bindPopup(popup);
+        polys.addLayer(gl);
+        center = gl.getBounds().getCenter();
+        bounds.push(gl.getBounds());
+      } catch (e) { /* sai định dạng -> chỉ dùng điểm */ }
     }
-    const k = f.lat + ',' + f.lng, i = (seen[k] = (seen[k] || 0) + 1) - 1;
-    const off = f.coord_src === 'country' ? 0.8 : 0;
-    layers.push(L.circleMarker([f.lat + (i % 4) * off, f.lng + Math.floor(i / 4) * off],
-      { radius: 8, color: '#3f7440', weight: 2, fillColor: '#529351', fillOpacity: .55 })
-      .bindPopup(popup).addTo(map));
+    const pin = L.circleMarker(center, { radius: 9, color: '#fff', weight: 2, fillColor: '#529351', fillOpacity: 1 })
+      .bindPopup(popup).bindTooltip(f.supplier, { direction: 'top' });
+    pins.addLayer(pin);
+    bounds.push(L.latLngBounds([center, center]));
+    const c = f.country || '—';
+    (MAP_GROUPS[c] = MAP_GROUPS[c] || []).push(center);
   });
-  map.fitBounds(L.featureGroup(layers).getBounds().pad(0.3));
+
+  const all = bounds.reduce((acc, b) => acc ? acc.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast()), null);
+  if (all) map.fitBounds(all.pad(0.35));
+
+  // Ở mức nhìn toàn cầu thì thửa quá nhỏ -> hiện điểm; phóng to đủ gần thì trả lại ranh giới thửa
+  function syncLayers() {
+    const z = map.getZoom();
+    if (z >= 9) { if (map.hasLayer(pins)) map.removeLayer(pins); }
+    else if (!map.hasLayer(pins)) map.addLayer(pins);
+  }
+  map.on('zoomend', syncLayers);
+  syncLayers();
+  renderMapLegend();
+}
+
+function zoomCountry(c) {
+  if (!map || !MAP_GROUPS[c]) return;
+  map.fitBounds(L.latLngBounds(MAP_GROUPS[c]).pad(0.6), { maxZoom: 11 });
+}
+function zoomAll() {
+  if (!map) return;
+  const all = Object.values(MAP_GROUPS).flat();
+  if (all.length) map.fitBounds(L.latLngBounds(all).pad(0.35));
+}
+function renderMapLegend() {
+  const el = $('mapLegend');
+  if (!el) return;
+  const cs = Object.keys(MAP_GROUPS);
+  el.innerHTML = `<span><span class="dot"></span> ${T.legend}</span>` +
+    cs.map(c => `<button class="zoom-btn" onclick="zoomCountry('${esc(c).replace(/'/g, "\\'")}')">${esc(c)} (${MAP_GROUPS[c].length})</button>`).join('') +
+    `<button class="zoom-btn" onclick="zoomAll()">${T.zoom_all}</button>`;
 }
 
 /* ── QR ── */
