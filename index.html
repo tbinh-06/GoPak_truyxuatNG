@@ -178,6 +178,17 @@ h1,h2,h3{font-family:"Poppins",sans-serif;letter-spacing:-.01em;}
 .sc-step-active .sc-circle{box-shadow:0 0 0 4px #fff,0 0 0 6px var(--brand);}
 .sc-step-active .sc-name{color:var(--brand-dark);}
 .proc-table-wrap{margin-top:18px;}
+.item-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;}
+.item-bar-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--label);
+  font-weight:700;margin-right:4px;}
+.item-chip{background:#fff;border:1px solid var(--border);color:var(--muted);font-family:"IBM Plex Mono";
+  font-size:12px;font-weight:600;padding:6px 13px;border-radius:20px;cursor:pointer;}
+.item-chip:hover{background:var(--green-bg);color:var(--brand-dark);border-color:var(--brand);}
+.item-chip.active{background:var(--brand);border-color:var(--brand);color:#fff;}
+.item-info{margin-top:10px;padding:12px 16px;background:var(--green-bg);border:1px solid #cfe3cf;
+  border-radius:var(--radius);font-size:13px;line-height:1.5;}
+.item-info .item-meta{display:block;margin-top:3px;font-size:11.5px;color:var(--muted);font-family:"IBM Plex Mono";}
 .step-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
   border:1px solid var(--border);border-radius:var(--radius);background:#f7faf6;margin-bottom:14px;}
 .step-head .sh{padding:12px 16px;border-right:1px solid var(--border);}
@@ -421,6 +432,7 @@ const I18N = {
     th_pallet: 'Mã pallet', th_container: 'Container',
     h_supplier: 'Nhà cung cấp giấy', h_maker: 'Nhà sản xuất', h_buyer: 'Khách hàng',
     h_vessel: 'Tàu / chuyến', h_route: 'Cảng đi → cảng đến', h_total: 'Tổng lô hàng',
+    pick_item: 'Lọc chuỗi theo mã hàng:', sec_doc_po: 'Hồ sơ thẩm định',
     h_consignee: 'Bên nhận hàng (consignee)', th_cust_item: 'Customer item', th_ctn: 'Cartons',
     th_per_ctn: "Q'ty/CTN", th_pcs: 'Total pcs',
     open_folder: '📁 Mở thư mục hồ sơ', doc_have: (x, y) => `${x}/${y} chứng từ đã có link`,
@@ -497,6 +509,7 @@ const I18N = {
     th_pallet: 'Pallet', th_container: 'Container',
     h_supplier: 'Paper supplier', h_maker: 'Manufacturer', h_buyer: 'Customer',
     h_vessel: 'Vessel / voyage', h_route: 'POL → POD', h_total: 'Shipment total',
+    pick_item: 'Filter the chain by item code:', sec_doc_po: 'Due diligence statement',
     h_consignee: 'Consignee', th_cust_item: 'Customer item', th_ctn: 'Cartons',
     th_per_ctn: "Q'ty/CTN", th_pcs: 'Total pcs',
     open_folder: '📁 Open the document folder', doc_have: (x, y) => `${x}/${y} documents linked`,
@@ -592,6 +605,22 @@ function forestGroups(p) {
   return Object.values(m).map(g => ({ ...g, atts: uniq(g.atts), pulps: uniq(g.pulps),
     start: g.starts.sort()[0] || '', end: g.ends.sort().pop() || '' }));
 }
+// Toàn bộ mã hàng thuộc một PO
+const poProducts = po => P.filter(x => x.po === po);
+// Gộp dòng nguồn của mọi mã hàng trong PO (bỏ trùng) để tổng hợp cho mục 03-06
+function mergedPo(list) {
+  const seen = new Set(), all = [];
+  list.forEach(p => p.sources.forEach(s => {
+    const k = [s.forest.supplier, s.pulp.supplier, s.forest.attachment,
+               s.forest.start, s.forest.fm_no].join('|');
+    if (seen.has(k)) return;
+    seen.add(k);
+    all.push(s);
+  }));
+  return { ...list[0], sources: all };
+}
+const sumBy = (list, k) => list.reduce((s, x) => s + (Number(x[k]) || 0), 0);
+
 function pulpGroups(p) {
   const m = {};
   p.sources.forEach(s => {
@@ -604,17 +633,27 @@ function pulpGroups(p) {
 }
 
 /* ══ HỒ SƠ ══ */
-let CUR = null, MAPF = [];
+let CUR = null, MAPF = [], PO = '', PRODS = [], AGG = null, CUR_STEP = 'forest';
 
-function renderRecord(code) {
-  const p = prodOf(code);
-  if (!p) return notFound(code);
-  CUR = p;
-  const fg = forestGroups(p), pg = pulpGroups(p);
+function renderRecord(code, itemCode) {
+  const p0 = prodOf(code);
+  if (!p0) return notFound(code);
+  PO = p0.po;
+  PRODS = poProducts(PO);
+  const picked = itemCode && PRODS.find(x => x.item.toUpperCase() === String(itemCode).toUpperCase());
+  CUR = picked || (PRODS.find(x => x.item === p0.item) || PRODS[0]);
+  AGG = mergedPo(PRODS);
+  const p = AGG;                                   // mục 01, 03-06 dùng dữ liệu toàn PO
+  const fg = forestGroups(AGG), pg = pulpGroups(AGG);
   MAPF = fg;
   const countries = uniq(fg.map(f => f.country).filter(Boolean));
+  const totCases = sumBy(PRODS, 'cases'), totNw = sumBy(PRODS, 'nw'), totPcs = sumBy(PRODS, 'pcs');
+  // Mục 01 và 05 nói về cả lô hàng -> dùng số tổng của PO, không phải của 1 mã hàng
+  AGG.cases = totCases; AGG.nw = totNw; AGG.pcs = totPcs; AGG.gw = sumBy(PRODS, 'gw');
+  AGG.item = PRODS.map(x => x.item).join(', ');
+  AGG.desc = PRODS.length + ' ' + T.u_items;
 
-  $('topCode').textContent = p.po;
+  $('topCode').textContent = PO;
   $('recBody').innerHTML = `
   <div class="hero">
     <div class="hero-top">
@@ -625,22 +664,23 @@ function renderRecord(code) {
       <div class="export-date">
         <div class="lbl">${T.ship_date}</div>
         <div class="val">${dmy(p.ship_date)}</div>
-        <div class="sub">${esc(p.item)} · HS ${esc(p.hs)}</div>
+        <div class="sub">${esc(p.invoice)} · HS ${esc(p.hs)}</div>
       </div>
     </div>
     <div class="code-row">
-      <div class="code-pill">${esc(p.po)}</div>
+      <div class="code-pill">${esc(PO)}</div>
       <div class="valid-pill">✓ ${esc(p.invoice)}</div>
+      <div class="valid-pill">${PRODS.length} ${T.u_items}</div>
     </div>
     <div class="stat-row">
-      <div class="stat"><div class="num">${fmt(p.cases)}</div><div class="lbl">${T.st_case}</div></div>
-      <div class="stat"><div class="num">${fmt(p.nw)}</div><div class="lbl">${T.st_nw}</div></div>
+      <div class="stat"><div class="num">${fmt(totCases)}</div><div class="lbl">${T.st_case}</div></div>
+      <div class="stat"><div class="num">${fmt(totNw)}</div><div class="lbl">${T.st_nw}</div></div>
       <div class="stat"><div class="num">${fg.length}</div><div class="lbl">${T.st_forest}</div></div>
       <div class="stat"><div class="num">${countries.length}</div><div class="lbl">${T.st_country}</div></div>
     </div>
     <div class="hero-qr-wrap">
       <div class="hero-qr-box" id="qrBox"></div>
-      <button class="hero-qr-dl" onclick="downloadQr('${esc(p.po)}')">${T.dl_qr}</button>
+      <button class="hero-qr-dl" onclick="downloadQr('${esc(PO)}')">${T.dl_qr}</button>
     </div>
   </div>
 
@@ -700,13 +740,20 @@ function renderRecord(code) {
       <div class="section-sub">${T.sec2_sub}</div>
     </div>
     <div class="codes-row">
-      <div class="cell"><div class="lbl">PO</div><div class="val">${esc(p.po)}</div></div>
-      <div class="cell"><div class="lbl">Item code</div><div class="val">${esc(p.item)}</div>
-        <div class="sub">${esc(p.desc)}</div></div>
-      <div class="cell"><div class="lbl">HS code</div><div class="val">${esc(p.hs)}</div></div>
+      <div class="cell"><div class="lbl">PO</div><div class="val">${esc(PO)}</div>
+        <div class="sub">${PRODS.length} ${T.u_items}</div></div>
       <div class="cell"><div class="lbl">Invoice No</div><div class="val">${esc(p.invoice)}</div>
         <div class="sub">${dmy(p.ship_date)}</div></div>
+      <div class="cell"><div class="lbl">HS code</div><div class="val">${esc(p.hs)}</div></div>
+      <div class="cell"><div class="lbl">${T.h_total}</div><div class="val">${fmt(totCases)} ctn</div>
+        <div class="sub">${fmt(totNw)} kg · ${fmt(totPcs)} pcs</div></div>
     </div>
+
+    <div class="item-bar">
+      <span class="item-bar-lbl">${T.pick_item}</span>
+      ${PRODS.map(x => `<button class="item-chip" id="chip_${esc(x.item)}" onclick="setItem('${esc(x.item)}')">${esc(x.item)}</button>`).join('')}
+    </div>
+    <div class="item-info" id="itemInfo"></div>
 
     <div class="accordion open" id="scAcc" onclick="toggleAcc('scAcc','scPanel')">
       <span class="l"><span class="ic">⚙</span> ${T.acc_sc}
@@ -718,19 +765,19 @@ function renderRecord(code) {
       <div class="sc-timeline">
         <div class="sc-step" id="st_forest" onclick="showStep('forest')">
           <div class="sc-circle">🌳</div><div class="sc-name">${T.n_forest}</div>
-          <div class="sc-sub">${fg.length} ${T.u_forest}</div></div>
+          <div class="sc-sub" id="sub_forest"></div></div>
         <div class="sc-step" id="st_pulp" onclick="showStep('pulp')">
           <div class="sc-circle">🪵</div><div class="sc-name">${T.n_pulp}</div>
-          <div class="sc-sub">${pg.length} ${T.u_mill}</div></div>
+          <div class="sc-sub" id="sub_pulp"></div></div>
         <div class="sc-step" id="st_paper" onclick="showStep('paper')">
           <div class="sc-circle">📄</div><div class="sc-name">${T.n_paper}</div>
-          <div class="sc-sub">${(p.paper_lots || []).length} ${T.u_lot}</div></div>
+          <div class="sc-sub" id="sub_paper"></div></div>
         <div class="sc-step" id="st_gopak" onclick="showStep('gopak')">
           <div class="sc-circle">🏭</div><div class="sc-name">Go-Pak</div>
-          <div class="sc-sub">${(p.prod_lots || []).length} ${T.u_prod}</div></div>
+          <div class="sc-sub" id="sub_gopak"></div></div>
         <div class="sc-step" id="st_ship" onclick="showStep('ship')">
           <div class="sc-circle">🚢</div><div class="sc-name">${T.n_ship}</div>
-          <div class="sc-sub">${P.length} ${T.u_items}</div></div>
+          <div class="sc-sub" id="sub_ship"></div></div>
       </div>
       <div id="scData" class="proc-table-wrap"></div>
     </div>
@@ -754,7 +801,7 @@ function renderRecord(code) {
   <div class="section">
     <div class="section-head">
       <div class="section-title"><span class="step">04</span> ${T.sec4}</div>
-      <div class="section-sub">${p.sources.length} ${T.sec4_sub}</div>
+      <div class="section-sub">${AGG.sources.length} ${T.sec4_sub} · ${PRODS.length} ${T.u_items}</div>
     </div>
     <div class="tbl-card"><div class="tbl-scroll">
       <table class="data forest-table"><thead><tr>
@@ -801,17 +848,17 @@ function renderRecord(code) {
       <div class="section-sub">${T.sec_doc_sub}</div>
     </div>
     <div class="tbl-card">
-      ${DRIVE.folder ? `<div class="tbl-cap"><div class="t">${esc(p.po)} · ${esc(p.invoice)}</div>
+      ${DRIVE.folder ? `<div class="tbl-cap"><div class="t">${esc(PO)} · ${esc(p.invoice)}</div>
         <a class="drive-btn" href="${esc(DRIVE.folder)}" target="_blank" rel="noopener">${T.open_folder}</a></div>` : ''}
       <div class="tbl-wrap"><table class="data"><thead><tr>
         <th>${T.th_no}</th><th>${T.th_doc}</th><th>${T.th_link}</th></tr></thead>
         <tbody>${DOC_TYPES.map((k, i) => `<tr>
           <td class="mono">${i + 1}</td>
           <td><b>${esc(T.doc[k])}</b></td>
-          <td>${driveBtn(docLink(p.po, k), T.open_drive)}</td></tr>`).join('')}
+          <td>${driveBtn(docLink(PO, k), T.open_drive)}</td></tr>`).join('')}
         </tbody></table></div>
     </div>
-    <div class="section-sub" style="margin-top:8px">${T.doc_have(DOC_TYPES.filter(k => docLink(p.po, k)).length, DOC_TYPES.length)}</div>
+    <div class="section-sub" style="margin-top:8px">${T.doc_have(DOC_TYPES.filter(k => docLink(PO, k)).length, DOC_TYPES.length)}</div>
   </div>
 
   <div class="footer">
@@ -820,10 +867,40 @@ function renderRecord(code) {
     <div class="r"><div class="lbl">${T.foot_lbl}</div><div class="val">EUDR · (EU) 2023/1115</div></div>
   </div>`;
 
-  document.title = p.po + ' · ' + p.item + ' · Go-Pak DDS';
-  showStep('forest');
-  makeQr('qrBox', recUrl(p.po), 92);
+  document.title = PO + ' · ' + T.sec_doc_po + ' · Go-Pak DDS';
+  applyItem();
+  showStep(CUR_STEP);
+  makeQr('qrBox', recUrl(PO), 92);
   drawMap();
+}
+
+// Đổi mã hàng: chỉ mục 02 (chuỗi cung ứng) đổi theo; mục 03-06 vẫn là tổng của cả PO.
+function setItem(item) {
+  const x = PRODS.find(y => y.item === item);
+  if (!x) return;
+  CUR = x;
+  applyItem();
+  showStep(CUR_STEP);
+  const u = new URLSearchParams(location.search);
+  u.set('po', PO); u.set('item', item);
+  history.replaceState(null, '', '?' + u.toString());
+}
+function applyItem() {
+  PRODS.forEach(x => {
+    const c = $('chip_' + x.item);
+    if (c) c.classList.toggle('active', x.item === CUR.item);
+  });
+  const info = $('itemInfo');
+  if (info) info.innerHTML = `<b class="mono">${esc(CUR.item)}</b> · ${esc(CUR.desc)}
+    <span class="item-meta">${fmt(CUR.cases)} ctn · ${fmt(CUR.pcs)} pcs · NW ${fmt(CUR.nw)} kg · GW ${fmt(CUR.gw)} kg · ${fmt(CUR.cbm)} CBM</span>`;
+  const n = {
+    sub_forest: forestGroups(CUR).length + ' ' + T.u_forest,
+    sub_pulp: pulpGroups(CUR).length + ' ' + T.u_mill,
+    sub_paper: (CUR.paper_lots || []).length + ' ' + T.u_lot,
+    sub_gopak: (CUR.prod_lots || []).length + ' ' + T.u_prod,
+    sub_ship: PRODS.length + ' ' + T.u_items
+  };
+  Object.keys(n).forEach(k => { const el = $(k); if (el) el.textContent = n[k]; });
 }
 
 function mapStatus(fg) {
@@ -836,6 +913,7 @@ function mapStatus(fg) {
 
 /* ── Bảng theo từng mắt xích ── */
 function showStep(kind) {
+  CUR_STEP = kind;
   const p = CUR;
   document.querySelectorAll('.sc-step').forEach(e => e.classList.remove('sc-step-active'));
   const el = $('st_' + kind);
@@ -1075,7 +1153,7 @@ function renderList(inv, po) {
       <th>Item code</th><th>${T.th_cust_item}</th><th>Production description</th><th>HS code</th>
       <th class="num">${T.th_ctn}</th><th class="num">${T.th_pcs}</th><th class="num">NW (kg)</th>
       <th class="num">GW (kg)</th><th class="num">CBM</th><th class="num">${T.th_forest_n}</th></tr></thead>
-      <tbody>${list.map(p => `<tr onclick="location.href=lnkUrl('?po=' + encodeURIComponent('${esc(p.item)}'))" style="cursor:pointer">
+      <tbody>${list.map(p => `<tr onclick="location.href=lnkUrl('?po=${esc(p.po)}&item=' + encodeURIComponent('${esc(p.item)}'))" style="cursor:pointer">
         <td><span class="mono lnk">${esc(p.item)}</span></td>
         <td class="mono">${esc(p.cust_item || '—')}</td>
         <td style="max-width:320px">${esc(p.desc)}</td>
@@ -1166,10 +1244,10 @@ function submit() {
   if (mode === 'inv' && P.some(p => p.invoice.toUpperCase() === u))
     return location.href = lnkUrl('?list=1&inv=' + encodeURIComponent(raw));
   if (mode === 'po' && P.some(p => p.po.toUpperCase() === u))
-    return location.href = lnkUrl('?list=1&po=' + encodeURIComponent(raw));
+    return location.href = lnkUrl('?po=' + encodeURIComponent(raw));
   if (mode === 'item') {
     const p = P.find(x => x.item.toUpperCase() === u || (x.cust_item || '').toUpperCase() === u);
-    if (p) return location.href = lnkUrl('?po=' + encodeURIComponent(p.item));
+    if (p) return location.href = lnkUrl('?po=' + encodeURIComponent(p.po) + '&item=' + encodeURIComponent(p.item));
   }
   $('errorMsg').style.display = 'block';
 }
@@ -1177,8 +1255,8 @@ function quickGo(raw) {
   if (!raw) return;
   const u = raw.trim().toUpperCase();
   const it = P.find(x => x.item.toUpperCase() === u || (x.cust_item || '').toUpperCase() === u);
-  if (it) return location.href = lnkUrl('?po=' + encodeURIComponent(it.item));
-  if (P.some(x => x.po.toUpperCase() === u)) return location.href = lnkUrl('?list=1&po=' + encodeURIComponent(raw.trim()));
+  if (it) return location.href = lnkUrl('?po=' + encodeURIComponent(it.po) + '&item=' + encodeURIComponent(it.item));
+  if (P.some(x => x.po.toUpperCase() === u)) return location.href = lnkUrl('?po=' + encodeURIComponent(raw.trim()));
   if (P.some(x => x.invoice.toUpperCase() === u)) return location.href = lnkUrl('?list=1&inv=' + encodeURIComponent(raw.trim()));
   location.href = lnkUrl('?po=' + encodeURIComponent(raw.trim()));
 }
@@ -1216,7 +1294,7 @@ function applyStatic() {
   applyStatic();
   const q = new URLSearchParams(location.search);
   if (q.get('list')) { $('page-list').classList.add('active'); return renderList(q.get('inv'), q.get('po')); }
-  if (q.get('po')) { $('page-record').classList.add('active'); return renderRecord(q.get('po')); }
+  if (q.get('po')) { $('page-record').classList.add('active'); return renderRecord(q.get('po'), q.get('item')); }
   $('page-search').classList.add('active');
   document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => setMode(b.getAttribute('data-mode'))));
   $('searchForm').addEventListener('submit', e => { e.preventDefault(); submit(); });
