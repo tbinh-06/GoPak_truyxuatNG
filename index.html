@@ -343,7 +343,6 @@ table.forest-table th{line-height:1.3;}
     <div class="mode-toggle">
       <button class="mode-btn active" data-mode="po"></button>
       <button class="mode-btn" data-mode="item"></button>
-      <button class="mode-btn" data-mode="inv"></button>
     </div>
 
     <form class="search-wrap" id="searchForm">
@@ -1153,7 +1152,7 @@ function renderList(inv, po) {
 
   <div class="section">
     <div class="section-head"><div class="section-title"><span class="step">01</span> ${T.lsec1}</div>
-      <div class="section-sub">${T.lsec1_sub(invoices().length)}</div></div>
+</div>
     <div class="tbl-card"><div class="tbl-wrap"><table class="data"><thead><tr>
       <th>Item code</th><th>Production description</th><th>HS code</th><th>Forest cert COC</th>
       <th class="num">Q'ty (case)</th><th class="num">NW (kg)</th>
@@ -1192,8 +1191,7 @@ function notFound(code) {
 /* ══ TRA CỨU & ĐIỀU HƯỚNG ══ */
 const MODES = {
   po: { ph: 'PO036009', sub: T.sub_po, label: T.mode_po, ex: () => uniq(P.map(p => p.po)) },
-  item: { ph: 'D04004EU', sub: T.sub_item, label: T.mode_item, ex: () => P.map(p => p.item) },
-  inv: { ph: 'GPP2609053', sub: T.sub_inv, label: T.mode_inv, ex: () => invoices() }
+  item: { ph: 'D04004EU', sub: T.sub_item, label: T.mode_item, ex: () => P.map(p => p.item) }
 };
 let mode = 'po';
 function setMode(m) {
@@ -1210,8 +1208,6 @@ function setMode(m) {
 function submit() {
   const raw = ($('searchInput').value || '').trim(), u = raw.toUpperCase();
   if (!raw) return;
-  if (mode === 'inv' && P.some(p => p.invoice.toUpperCase() === u))
-    return location.href = lnkUrl('?list=1&inv=' + encodeURIComponent(raw));
   if (mode === 'po' && P.some(p => p.po.toUpperCase() === u))
     return location.href = lnkUrl('?po=' + encodeURIComponent(raw));
   if (mode === 'item') {
@@ -1272,7 +1268,6 @@ function applyStatic() {
   const cs = uniq(P.flatMap(p => forestsOf(p).map(f => f.country)).filter(Boolean));
   $('searchLinks').innerHTML = `
     <div><b>${P.length}</b> ${T.u_items}</div>
-    <div><b>${invoices().length}</b> ${T.u_inv}</div>
     <div><b>${fs.length}</b> ${T.u_forest}</div>
     <div><b>${cs.length}</b> ${T.u_country}</div>
     <div><a href="${lnkUrl('?list=1')}">${T.view_all}</a></div>`;
