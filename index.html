@@ -89,7 +89,7 @@ h1,h2,h3{font-family:"Be Vietnam Pro","Segoe UI",sans-serif;letter-spacing:-.01e
 .btn:hover{background:var(--brand-dark);}
 .btn.outline{background:#fff;color:var(--text);border:1px solid var(--border);}
 .btn.outline:hover{background:var(--bg);}
-.wrap{max-width:1120px;margin:24px auto;padding:0 20px 60px;}
+.wrap{max-width:1320px;margin:24px auto;padding:0 20px 60px;}
 
 /* ══ HERO ══ */
 .hero{border-radius:16px;color:#fff;padding:28px 32px;position:relative;overflow:hidden;
@@ -163,7 +163,9 @@ h1,h2,h3{font-family:"Be Vietnam Pro","Segoe UI",sans-serif;letter-spacing:-.01e
 .accordion.open .chev{transform:rotate(180deg);}
 .proc-panel{display:none;border:1px solid var(--border);border-top:none;
   border-radius:0 0 var(--radius) var(--radius);background:#fff;padding:20px 22px 26px;}
-.proc-panel .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);}
+.proc-panel .tbl-wrap{overflow:auto;max-height:460px;border:1px solid var(--border);border-radius:var(--radius);}
+.proc-panel .tbl-wrap thead th{position:sticky;top:0;z-index:3;background:#f2f7f1;
+  box-shadow:inset 0 -1px 0 var(--border);}
 .proc-panel.open{display:block;}
 
 /* ══ TIMELINE CHUỖI ══ */
@@ -224,21 +226,11 @@ table.data.boxed{border:1px solid var(--border);border-radius:var(--radius);over
 .drive-btn.sm{font-size:11px;padding:4px 9px;}
 .drive-btn.ghost{background:#fff;color:var(--muted);border-color:var(--border);font-weight:600;}
 .drive-btn.ghost:hover{background:var(--green-bg);color:var(--brand-dark);border-color:var(--brand);}
-.tbl-scroll{max-height:440px;overflow-y:auto;overflow-x:hidden;}
-.tbl-scroll thead th{position:sticky;top:0;z-index:2;}
-table.forest-table{table-layout:fixed;width:100%;font-size:11.5px;}
-table.forest-table th,table.forest-table td{padding:8px 9px;white-space:normal;word-break:break-word;}
-table.forest-table th{white-space:normal;}
-table.forest-table th:nth-child(1),table.forest-table td:nth-child(1){width:18%;}
-table.forest-table th:nth-child(2),table.forest-table td:nth-child(2){width:12%;}
-table.forest-table th:nth-child(3),table.forest-table td:nth-child(3){width:13%;}
-table.forest-table th:nth-child(4),table.forest-table td:nth-child(4){width:14%;}
-table.forest-table th:nth-child(5),table.forest-table td:nth-child(5){width:10%;}
-table.forest-table th:nth-child(6),table.forest-table td:nth-child(6){width:9%;}
-table.forest-table th:nth-child(7),table.forest-table td:nth-child(7){width:6%;}
-table.forest-table th:nth-child(8),table.forest-table td:nth-child(8){width:8%;}
-table.forest-table th:nth-child(9),table.forest-table td:nth-child(9){width:10%;}
-table.forest-table .sub-line{font-size:10px;}
+.tbl-scroll{max-height:460px;overflow:auto;}
+.tbl-scroll thead th{position:sticky;top:0;z-index:3;background:#f2f7f1;box-shadow:inset 0 -1px 0 var(--border);}
+table.forest-table{width:100%;min-width:1760px;font-size:12px;}
+table.forest-table th,table.forest-table td{padding:9px 11px;white-space:normal;vertical-align:top;}
+table.forest-table th{line-height:1.3;}
 .tbl-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .tbl-cap{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;
   align-items:center;gap:12px;flex-wrap:wrap;}
@@ -294,7 +286,47 @@ table.forest-table .sub-line{font-size:10px;}
   .sc-timeline{flex-wrap:wrap;gap:14px;} .sc-timeline::before{display:none;} .sc-step{width:46%;}
   .search-box{width:150px;}
 }
-@media print{.topbar,.accordion{display:none;} body{background:#fff;}}
+/* ══ BẢN IN / XUẤT PDF ══
+   Khổ in hẹp hơn màn hình nên các luật responsive ở trên sẽ bẻ bố cục;
+   phần này ép lại: timeline nằm ngang, bảng không cuộn mà tự xuống dòng. */
+@page{size:A4 landscape;margin:10mm;}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
+  body{background:#fff;font-size:11px;}
+  .topbar,.accordion,.lang-btn,.lang-toggle,.item-bar,.zoom-btn,.dir-btn,
+  .leaflet-control-zoom,.leaflet-control-attribution{display:none !important;}
+  .wrap{max-width:none;margin:0;padding:0;}
+  .section{margin-top:14px;}
+  .section-head{break-after:avoid;}
+  .hero{border-radius:10px;padding:16px 20px;}
+  .hero h1{font-size:18px;} .hero::after{display:none;}
+  .stat .num{font-size:15px;}
+  .hero-qr-wrap{position:static;float:right;margin:0;}
+
+  /* timeline: luôn nằm ngang, không bẻ cột */
+  .proc-panel{display:block !important;border-radius:var(--radius);}
+  .sc-timeline{display:flex !important;flex-wrap:nowrap !important;gap:0;}
+  .sc-timeline::before{display:block !important;}
+  .sc-step{width:auto !important;flex:1 1 0;}
+  .sc-circle{width:30px;height:30px;font-size:13px;}
+  .sc-name{font-size:10.5px;} .sc-sub{font-size:9.5px;}
+
+  /* bảng: in hết, không thanh cuộn */
+  .tbl-wrap,.tbl-scroll,.proc-panel .tbl-wrap{overflow:visible !important;max-height:none !important;}
+  table.data{min-width:0 !important;width:100% !important;font-size:9.5px;table-layout:fixed;}
+  table.data td{padding:5px 6px;white-space:normal !important;overflow-wrap:anywhere;}
+  table.data th{padding:5px 6px;font-size:8px;letter-spacing:0;line-height:1.25;
+    white-space:normal !important;word-break:normal;overflow-wrap:normal;hyphens:auto;}
+  table.data thead{display:table-header-group;}
+  table.data tr{break-inside:avoid;}
+  .sub-line{font-size:8.5px;}
+  .drive-btn{border:none;background:none;padding:0;font-size:8.5px;}
+
+  #map{height:300px;}
+  .card,.map-card,.codes-row,.totals-row{break-inside:avoid;}
+  .tbl-card{break-inside:auto;}
+  .footer{break-inside:avoid;}
+}
 </style>
 </head>
 <body>
@@ -687,12 +719,11 @@ function renderRecord(code, itemCode) {
       <div class="export-date">
         <div class="lbl">${T.ship_date}</div>
         <div class="val">${dmy(p.ship_date)}</div>
-        <div class="sub">${esc(p.invoice)} · HS ${esc(p.hs)}</div>
+        <div class="sub">HS ${esc(p.hs)}</div>
       </div>
     </div>
     <div class="code-row">
       <div class="code-pill">${esc(PO)}</div>
-      <div class="valid-pill">✓ ${esc(p.invoice)}</div>
       <div class="valid-pill">${PRODS.length} ${T.u_items}</div>
     </div>
     <div class="stat-row">
@@ -754,8 +785,7 @@ function renderRecord(code, itemCode) {
     <div class="codes-row">
       <div class="cell"><div class="lbl">PO</div><div class="val">${esc(PO)}</div>
         <div class="sub">${PRODS.length} ${T.u_items}</div></div>
-      <div class="cell"><div class="lbl">Invoice No</div><div class="val">${esc(p.invoice)}</div>
-        <div class="sub">${dmy(p.ship_date)}</div></div>
+      <div class="cell"><div class="lbl">Shipment date</div><div class="val">${dmy(p.ship_date)}</div></div>
       <div class="cell"><div class="lbl">HS code</div><div class="val">${esc(p.hs)}</div></div>
       <div class="cell"><div class="lbl">${T.h_total}</div><div class="val">${fmt(totCases)} ctn</div>
         <div class="sub">NW ${fmt(totNw)} kg</div></div>
@@ -814,25 +844,30 @@ function renderRecord(code, itemCode) {
     </div>
     <div class="tbl-card"><div class="tbl-scroll">
       <table class="data forest-table"><thead><tr>
-        <th>Forest supplier</th><th>Species</th><th>Country / place</th>
-        <th>FM cert</th><th>Forest type</th><th>Harvest</th><th>Risk</th>
-        <th>${T.th_coord}</th><th>Attachment</th></tr></thead>
+        <th>Forest supplier</th><th>Scientific name</th><th>Common name</th>
+        <th>Country</th><th>Production place</th><th>FM cert type</th><th>FM cert number</th>
+        <th>Forest type</th><th>Forest owner type</th><th>Harvest started</th><th>Harvest ended</th>
+        <th>Risk</th><th>Latitude</th><th>Longitude</th><th>Attachment</th></tr></thead>
       <tbody>${[...fg].sort((x, y) => (y.geoKeys || []).length - (x.geoKeys || []).length).map(f => `<tr>
-        <td><b>${esc(f.supplier)}</b>
-          ${f.n > 1 ? `<div class="sub-line">${f.n} ${T.n_rows}</div>` : ''}</td>
-        <td>${dash(f.sci)}<div class="sub-line">${esc(f.common || '')}</div></td>
-        <td>${dash(f.country)}<div class="sub-line">${esc(f.place || '')}</div></td>
-        <td>${dash(f.fm_type)}<div class="sub-line mono">${esc(f.fm_no || '')}</div></td>
-        <td>${dash(f.forest_type)}<div class="sub-line">${esc(f.owner_type || '')}</div></td>
-        <td class="mono">${dmy(f.start)}<div class="sub-line">→ ${dmy(f.end)}</div></td>
+        <td><b>${esc(f.supplier)}</b></td>
+        <td>${dash(f.sci)}</td>
+        <td>${dash(f.common)}</td>
+        <td>${dash(f.country)}</td>
+        <td>${dash(f.place)}</td>
+        <td>${dash(f.fm_type)}</td>
+        <td class="mono" style="font-size:11px">${dash(f.fm_no)}</td>
+        <td>${dash(f.forest_type)}</td>
+        <td>${dash(f.owner_type)}</td>
+        <td class="mono">${dmy(f.start)}</td>
+        <td class="mono">${dmy(f.end)}</td>
         <td>${risk(f.total_risk || f.risk)}</td>
-        <td class="mono">${(f.geoKeys || []).length
-          ? esc(f.lat) + '<div class="sub-line">' + esc(f.lng) + '</div>'
-          : `<span class="chip none">${T.no_coord}</span>`}</td>
-        <td>${f.atts.slice(0, 2).map(a => `<a class="drive-btn sm${hasFile(a) ? '' : ' ghost'}" href="${esc(geoLink(a))}" target="_blank" rel="noopener">${fileKind(a)} ↗</a>
-          <div class="sub-line mono">${esc(a)}</div>`).join('')
-          || '<span class="chip none">—</span>'}${f.atts.length > 2
-          ? `<a class="drive-btn sm ghost" href="${esc(DRIVE_FOLDER)}" target="_blank" rel="noopener">+${f.atts.length - 2} file ↗</a>` : ''}</td>
+        <td class="mono">${(f.geoKeys || []).length ? esc(f.lat) : `<span class="chip none">${T.no_coord}</span>`}</td>
+        <td class="mono">${(f.geoKeys || []).length ? esc(f.lng) : `<span class="chip none">${T.no_coord}</span>`}</td>
+        <td>${f.atts.length
+          ? (f.atts.length === 1
+              ? `<a class="drive-btn sm${hasFile(f.atts[0]) ? '' : ' ghost'}" href="${esc(geoLink(f.atts[0]))}" target="_blank" rel="noopener" title="${esc(f.atts[0])}">${fileKind(f.atts[0])} ↗</a>`
+              : `<a class="drive-btn sm" href="${esc(DRIVE_FOLDER)}" target="_blank" rel="noopener" title="${esc(f.atts.join(' · '))}">${f.atts.length} file ↗</a>`)
+          : '<span class="chip none">—</span>'}</td>
       </tr>`).join('')}</tbody></table>
     </div></div>
     <div class="totals-row">
@@ -849,7 +884,7 @@ function renderRecord(code, itemCode) {
       <div class="section-sub">${T.sec_doc_sub}</div>
     </div>
     <div class="tbl-card">
-      ${DRIVE.folder ? `<div class="tbl-cap"><div class="t">${esc(PO)} · ${esc(p.invoice)}</div>
+      ${DRIVE.folder ? `<div class="tbl-cap"><div class="t">${esc(PO)}</div>
         <a class="drive-btn" href="${esc(DRIVE.folder)}" target="_blank" rel="noopener">${T.open_folder}</a></div>` : ''}
       <div class="tbl-wrap"><table class="data"><thead><tr>
         <th>${T.th_no}</th><th>${T.th_doc}</th><th>${T.th_link}</th></tr></thead>
@@ -930,7 +965,7 @@ function showStep(kind) {
     // Khối Forest: cột AC → AP trong file
     html = tbl(['Scientific name', 'Common Name', 'Forest Supplier', 'Country of Origin', 'Country risk level',
                 'Production place Description', 'FM Cert Type', 'FM Certification Number', 'Forest type',
-                'Forest Owner Type', 'Harvest started', 'Harvest ended', 'Total risk level', 'Attachment'],
+                'Forest Owner Type', 'Harvest started', 'Harvest ended', 'Total risk level'],
       (p.sources || []).filter(s => s.forest.supplier).map(s => {
         const f = s.forest;
         return [dash(f.sci), dash(f.common), `<b>${esc(f.supplier)}</b>`,
@@ -938,8 +973,7 @@ function showStep(kind) {
           dash(f.fm_type), `<span class="mono">${esc(f.fm_no || '—')}</span>`,
           dash(f.forest_type), dash(f.owner_type),
           `<span class="mono">${dmy(f.start)}</span>`, `<span class="mono">${dmy(f.end)}</span>`,
-          risk(f.total_risk),
-          (f.attachments || []).map(x => `<a class="drive-btn sm${hasFile(x) ? '' : ' ghost'}" href="${esc(geoLink(x))}" target="_blank" rel="noopener">${fileKind(x)} ↗</a><div class="sub-line mono">${esc(x)}</div>`).join('') || '<span class="chip none">—</span>'];
+          risk(f.total_risk)];
       }));
   } else if (kind === 'pulp') {
     // Khối Pulp: cột U → AB
