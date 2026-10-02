@@ -463,7 +463,7 @@ const I18N = {
     lot_sub: (n, f, k) => `${n} khu rừng theo file Excel · ${f} thư mục Drive · ${k} file tải được`,
     th_lot: 'Thư mục', th_items: 'Mã hàng', th_files: 'Tải về',
     dl_all: n => `⬇ Tải cả ${n} file`, dl_folder: 'Thư mục Drive ↗', not_on_drive: 'chưa có trên Drive',
-    no_file_xls: 'Excel không ghi file', dl_folder_btn: n => `Tải thư mục ${n}`,
+    no_file_xls: 'Excel không ghi file', dl_folder_btn: n => `Tải file`,
     dl_meta: (n, s) => `${n} file · ${s}`, dl_miss: n => `${n} PDF chưa có trên Drive`, dl_hint: 'Trình duyệt có thể hỏi cho phép tải nhiều file, bấm Cho phép.',
     th_coord: 'Toạ độ', no_coord: 'chưa có', n_rows: 'dòng nguồn',
     tot_forest: 'Tổng chủ rừng', tot_country: 'Quốc gia khai thác', tot_cert: 'Rừng trồng có chứng nhận',
@@ -528,7 +528,7 @@ const I18N = {
     lot_sub: (n, f, k) => `${n} forest lots from the Excel file · ${f} Drive folders · ${k} downloadable files`,
     th_lot: 'Folder', th_items: 'Items', th_files: 'Download',
     dl_all: n => `⬇ Download all ${n}`, dl_folder: 'Drive folder ↗', not_on_drive: 'not on Drive yet',
-    no_file_xls: 'No file listed in Excel', dl_folder_btn: n => `Download folder ${n}`,
+    no_file_xls: 'No file listed in Excel', dl_folder_btn: n => `Download files`,
     dl_meta: (n, s) => `${n} files · ${s}`, dl_miss: n => `${n} PDF not on Drive yet`, dl_hint: 'Your browser may ask to allow multiple downloads — choose Allow.',
     th_coord: 'Coordinates', no_coord: 'not provided', n_rows: 'source rows',
     tot_forest: 'Forest suppliers', tot_country: 'Countries of harvest', tot_cert: 'Certified plantations',
@@ -997,9 +997,7 @@ function renderRecord(code, itemCode) {
         <td><b>${esc(l.supplier)}</b></td>
         <td class="files-col">${ok.length
           ? `<button class="dl-folder" onclick="downloadLot('${esc(PO)}', ${l.folder})"
-               title="${esc(ok.map(f => f.name).join('\n'))}">⬇ ${T.dl_folder_btn(l.folder)}</button>
-             <div class="dl-meta">${T.dl_meta(ok.length, fmtSize(ok.reduce((s, f) => s + (f.size || 0), 0)))}${
-               l.files.length > ok.length ? ` · <span class="miss">${T.dl_miss(l.files.length - ok.length)}</span>` : ''}</div>`
+               title="${esc(ok.map(f => f.name).join('\n'))}">⬇ ${T.dl_folder_btn(l.folder)}</button>`
           : `<span class="chip none">${T.no_file_xls}</span>`}</td>
         <td>${dash(l.sci)}</td>
         <td>${dash(l.common)}</td>
