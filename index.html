@@ -231,6 +231,25 @@ table.data.boxed{border:1px solid var(--border);border-radius:var(--radius);over
 table.forest-table{width:100%;min-width:1760px;font-size:12px;}
 table.forest-table th,table.forest-table td{padding:9px 11px;white-space:normal;vertical-align:top;}
 table.forest-table th{line-height:1.3;}
+table.forest-table{min-width:2050px;}
+table.forest-table td.files-col,table.forest-table th.files-col{min-width:340px;}
+.lot-no{text-align:center;}
+.lot-link{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:50%;
+  background:var(--green-bg);color:var(--brand-dark);font-weight:700;text-decoration:none;}
+.lot-link:hover{background:var(--brand);color:#fff;}
+.dl-list{display:flex;flex-direction:column;gap:4px;}
+.dl-file{display:flex;align-items:center;gap:8px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;
+  background:#fff;color:var(--text);text-decoration:none;font-size:11.5px;line-height:1.3;transition:.15s;}
+.dl-file .ic{flex:none;width:18px;height:18px;border-radius:50%;background:var(--green-bg);color:var(--brand-dark);
+  display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;}
+.dl-file .nm{flex:1;font-family:"IBM Plex Mono",monospace;word-break:break-all;}
+.dl-file .sz{flex:none;font-size:10.5px;color:var(--muted);}
+a.dl-file:hover{border-color:var(--brand);background:var(--green-bg);}
+a.dl-file:hover .ic{background:var(--brand);color:#fff;}
+.dl-file.off{background:#f6f7f6;color:var(--muted);border-style:dashed;}
+.dl-file.off .ic{background:#eef1ee;color:var(--muted);}
+.dl-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+button.drive-btn{cursor:pointer;font-family:inherit;}
 .tbl-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .tbl-cap{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;
   align-items:center;gap:12px;flex-wrap:wrap;}
@@ -436,6 +455,10 @@ const I18N = {
     map_miss: n => `${n} chủ rừng chưa có file ranh giới nên chưa hiện trên bản đồ.`,
     zoom_all: '↺ Xem toàn bộ',
     sec4: 'Danh sách khu rừng', sec4_sub: 'dòng nguồn trong hồ sơ',
+    lot_sub: (n, f, k) => `${n} khu rừng theo file Excel · ${f} thư mục Drive · ${k} file tải được`,
+    th_lot: 'Thư mục', th_items: 'Mã hàng', th_files: 'File đính kèm (bấm để tải)',
+    dl_all: n => `⬇ Tải cả ${n} file`, dl_folder: 'Thư mục Drive ↗', not_on_drive: 'chưa có trên Drive',
+    no_file_xls: 'Excel không ghi file', dl_hint: 'Trình duyệt có thể hỏi cho phép tải nhiều file, bấm Cho phép.',
     th_coord: 'Toạ độ', no_coord: 'chưa có', n_rows: 'dòng nguồn',
     tot_forest: 'Tổng chủ rừng', tot_country: 'Quốc gia khai thác', tot_cert: 'Rừng trồng có chứng nhận',
     v4_no2: n => `, ${n} chủ rừng chưa có file`,
@@ -496,6 +519,10 @@ const I18N = {
     map_miss: n => `${n} forest suppliers have no boundary file yet, so they are not shown on the map.`,
     zoom_all: '↺ View all',
     sec4: 'Forest list', sec4_sub: 'source rows in the file',
+    lot_sub: (n, f, k) => `${n} forest lots from the Excel file · ${f} Drive folders · ${k} downloadable files`,
+    th_lot: 'Folder', th_items: 'Items', th_files: 'Attachments (click to download)',
+    dl_all: n => `⬇ Download all ${n}`, dl_folder: 'Drive folder ↗', not_on_drive: 'not on Drive yet',
+    no_file_xls: 'No file listed in Excel', dl_hint: 'Your browser may ask to allow multiple downloads — choose Allow.',
     th_coord: 'Coordinates', no_coord: 'not provided', n_rows: 'source rows',
     tot_forest: 'Forest suppliers', tot_country: 'Countries of harvest', tot_cert: 'Certified plantations',
     v4_no2: n => `, ${n} suppliers without a file`,
@@ -559,10 +586,90 @@ const DRIVE = {
   },
   // "tên file": "ID file trên Drive"  ← dán bảng ánh xạ vào đây
   files: {
-    // 'BLC-SGN-DUB-2632-004_revised.pdf': '1AbC...',
-    // 'actas_10036.geojson': '1XyZ...',
+      "actas_10036.geojson": "11SG6S0_kOwP3eRkbK06XevpUqRjF1bcW",
+      "DN_A1N0002664.geojson": "1_Ta1cslM0GWlUwbVkxzLYhXqxTAWZzQD",
+      "MEDUFP705512 Geojson.geojson": "1ub01gCCs5OXY859V3ammzQASTLPdaNyr",
+      "KINGWOOD V.FKL010 geojson map.geojson": "1MCe4RGxNEPTnMcERqEP1ZsMWbBLlsxCr",
+      "DN_2590016201.geojson": "1IwJ5etq1sdOtzh-MMXSkQ74RHzSJS4Yt",
+      "DN_2590016368.geojson": "1PSZdn1C5k1xdeaLfYEOuMwlRxBdNOvO1",
+      "DN_A1N0002808.geojson": "1m5evbYSrQxOe1MR4hhH8Wf9aR37ez0mW",
+      "MEDUFP635321_25CE.geojson": "1ZxKWhuzShKpAiKGO4rvSBLiyGETfDerJ",
+      "Jul 2025 PN1E.geojson": "12Wahejf5J8zMSD2oZGBToLkRdgIhydhb",
+      "MEDUFP524343_96801525 (1).geojson": "1xAqi3KvA4RIaIEuO6EldL261y14uVTjO",
+      "Aug 2025 PN1E.geojson": "1RdrKQ1Kk5On-_CTq2xULH8BmL5Nhpoql",
+      "actas_10590(1).geojson": "1LuA3jrKerwu4dGy4HvrwVwZwusNEJNuc",
+      "actas_10629.geojson": "1O4D3FH_IwVY-_TeYG3gRgq99p86mG-Ai",
+      "actas_10590.geojson": "1_6LU9fGn8rhCEoxGtlouUxK8ZUZbjI-z",
+      "HKPAPER_250101409_CustPO_Date_29072025_SEPO_4504133618.geojson": "1a5TUjI6JB-eWE_aysPOLFL-3X1dHyCEv",
+      "4501110617.geojson": "1DON-P9XES-x3EWA1ww9D4AyOxPclmpLw",
+      "HK_PaperSources_250102869.geojson": "14w0_-GpJeSUyqFpwqTDE6og61cSEncYV",
+      "SDBH-CYAMYMCX-202601-01.geojson": "1-wCTDkNOfvLKOgN8v4GE0O4bsLKMXn-Z",
+      "Geojson_ Dragon_ PT Arara Abadi.geojson": "1wKKMXQCzbXuaSq_yaWo82t_AY77Efkog",
+      "Geojson_ OJI_Fibre_Manulife_ Tiaki.geojson": "1G08P678_wBS39YNKc7yBJqEioLPIGd_g",
+      "Geojson_OJI_Fiber_ Manulife_ OTPP.geojson": "18yFpPfBjcyz2PqZ8QMXZqLeaQd8SRNqP",
+      "Geojson_OJI_Fiber_ Timberlands_ KTML.geojson": "1pa0F4FBWLApzzYP-DwlPdkqDxE-U9F1M",
+      "May 2025 PN1E.geojson": "11WqNHhZd1YY_mLHyMGhHMnSYA6aVZDZz",
+      "May 2025 PA2E.geojson": "1dqJ2mrLasZHokHo2W8DDqf-QzG0uWjZJ",
+      "4500916924-Aug.geojson": "108G_NIgiY9v2KxgjabJiAIFEcTDHBszj",
+      "4500916924（SEP) .geojson": "1GVmGidl5Mh8K5ijOQrZAUWIIsRaiZ2I6",
+      "4500724916-Aug.geojson": "1jkC2GbuPS36tlJSyF00GAZ-Pru9eJhhB",
+      "4500724916-2025.Jan-Jun.geojson": "1FHEGzYTTife7Cz6ri9ISedRFvm9_1Htx",
+      "4500724916-Jul.geojson": "1JxtwYFvFUjkQ3EyY-ogwvKZ4Jnb8oMZn",
+      "4500963867-Oct.geojson": "166e49YLYpKF0vBuaSMGXJoWHDxTRlbk2",
+      "4500963867（DEC).geojson": "1R2Gz1w4Gw36T7dobrem0AXt5XjBa2jrS",
+      "4500963867（SEP) .geojson": "1e3VJfcjthFLeSj5nmaneYQKRHeoad-XX",
+      "4500963867（Jan).geojson": "1RAOJKzULhFVttHstlGqGbO6eZ9PAA9bj",
+      "4500963867(Nov).geojson": "1FSErNxaTXFPI0yIDainwMUXIRufTKH5A",
+      "4500959413(SEP)  .geojson": "1hBwL-q8VGDEKIyqg1ThPXry6B_f9Zj4g",
+      "4500959413-Oct.geojson": "1c46HHC0s5wpTcM7tasbn2Mzup3GWECcK",
+      "4500959413(DEC).geojson": "13X4ng2GelBvVQQIOfdCK2mSdUGa5wXy8",
+      "4500959413(Nov).geojson": "1K12bHeJ_c9uXSkvw1QeusDOE8g3x1ruB",
+      "4500959413(JAN).geojson": "1rlWDuM-Rc4hUU1WhNg3L_-RVUKt3iSOr",
+      "4500917045-Aug.geojson": "1watFLzHlUpsV-CcEc4L0By2PWJBkTsuo",
+      "4500917045（SEP) .geojson": "11aaZCqvO-dDQi4-ra3hY1gt9AkA9tUAZ",
+      "4500963905(DEC).geojson": "1AiCrL6w7wE3zf62zTvxNvAgscD7fhDax",
+      "4500963905-Oct.geojson": "1xR3N6SZLV1rSd0bgZ9zJaX-PmzTygiao",
+      "4500963905（SEP).geojson": "1Xca4p5h6-Mb7qOkyCsmMuwiEFU5_Hy72",
+      "4500963905(Nov).geojson": "1Kfa6KV--G0-I4ZPBH5QbvbtiuUTJmqA7",
+      "4500963905(Jan).geojson": "1OfempCQ63sZJVSvmnwEjaITkD9UtFoTA",
+      "4500724920-Aug.geojson": "1Uci7wmO9JehCcMSC8_GZ_v55jnrNO4A7",
+      "4500724920-2025.Jan-Jun.geojson": "1CUK7oxKflGhsDIUELKaasyPOiGMLdXwg",
+      "4500724920-Jul.geojson": "11CdmKHBl63S0Sm8hK5gpqd7U5rOp0MLP",
+      "4500916962（SEP) .geojson": "1eeKy5FMyUi_2ZmmZ3r9G5FYvsvo_wGnt",
+      "4500916962-Aug.geojson": "1H8UlsWk_vUbiYlfsycuOFHmBZNGxunBs",
+      "4500959726-Oct.geojson": "17qYSXogrFSUFs7xKnaqycuzeQNb_xmU8",
+      "4500959726(Nov).geojson": "1ilS9AHB2MI77IfQPX3k_y2gZyl7R91ea",
+      "4500963870-Oct.geojson": "197rx2qZ7Q06tJOF-WtrZUpXkjuM3xBv0",
+      "4500963870（SEP) .geojson": "1J2fUTitB34Bb3C_nleOzdgZecI7Qk5ll",
+      "4500744506-Jul.geojson": "1d8Pb3c6MPxB3rUw9rKoxATubIblzUlua",
+      "4500744506-Aug.geojson": "19TcBHi6r6l999KsF8BJJ9Hahjb8SX6P8",
+      "4500959410-Aug.geojson": "1RqVI5S6RrhkTwLsqZih0vX0vr7v1kGjf",
+      "4500959410(sep).geojson": "1t5DflB17g78TE2HaeYjcoA-OeckfprXm",
+      "4500959410（Jan).geojson": "1XEBZE2a-M49GtZ5gnnvdSBlEA-55iruu",
+      "4500959410（DEC).geojson": "1sEQEK04tCMuhmavTauUxZVRk29UpQfLF",
+      "4500959410-Oct.geojson": "15OrxQ4pcdNeDDdiv-EE3m5787ro7wH-i",
+      "4500959410(Nov).geojson": "1zb4kH0gGfvCKRk9GKGqF2rAhiTvUc8z1",
+      "4500963901-Oct.geojson": "1Rz_WHC698UBGWetmCmLy6CgPDgDP2NIR",
+      "4500963901(Nov).geojson": "1nfKNg1xBc5L6MEn0-pLrL42cy_zA4xMH",
+      "4500963901(DEC).geojson": "1p5s7zWCx5M2ifDQCk4yLsGq3jeCnit4p",
+      "4500963901(SEP).geojson": "1Wcr4pRAIWHX1uMJbiccbctzCfUQafIGU",
+      "4500724924-Aug.geojson": "1rI6hkHVcMoaNmr9t1_biVtdWi16dFSor",
+      "4500724924-2025.Jan-Jun.geojson": "1vDSr4UbDXwLUAFzAPc4WF5IzFonaOGTL",
+      "4500724924-Jul.geojson": "1AQmCGQIVogfAiSn7weBiuFq3BTzbNZUM",
+      "4500959640(SEP) .geojson": "1_nB7skNP81pVMmCUgUSJngykSmnZZVxe",
+      "4500959640-Oct.geojson": "1YFe2jLQgdEzivRj2BJXOMBab7rvEef3D",
+      "4500959640(Nov).geojson": "1YLJVgHgKKy7kwYd4hvxLs_YQLejn0NxK",
+      "4500959640-Aug.geojson": "1DNYYxyqe6anpaIg-H0UFvMiJIQQu3WC6",
+      "4500959640(DEC).geojson": "1L1ZqjXIM6zAHhfQM3rjYytyX5K3cx6Mr",
+      "4500917022-Aug.geojson": "1-WJghqsqCbZTycILcuwm_rrZsPPNouYv",
+      "4500917022（SEP) .geojson": "1nzZy62tUUmijGrDpf2sTGJ3udxLvO65V",
+      "DN_A1N0002269.geojson": "1KsgYsPeB-LvQsUNpmZZn0GqwZyFie3S2"
   }
 };
+
+/* Danh sách khu rừng đúng theo file Excel, mỗi khu rừng ứng với 1 thư mục con đã xếp trên Drive
+   (folder = số thứ tự thư mục, folder_id = ID thư mục, files = file trong thư mục; id rỗng = chưa có trên Drive) */
+const FOREST_LOTS = {"PO036009": [{"sci": "Pinus radiata D.Don", "common": "Radiata Pine", "supplier": "Forestal Arauco S.A", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Ñuble of Chile", "fm_type": "PEFC", "fm_no": "CL21/819943415", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-10-01", "end": "2025-11-30", "risk": "Low", "pulp": "Celulosa Arauco y Constitución S.A - Nueva Aldea", "excel_files": ["actas_10036.geojson", "MEDUFP596028_EUDR Certificate_ZEUD.pdf"], "items": ["D04004EU", "D04023EU", "D01022EU"], "folder": 1, "folder_id": "15g8SwmQ5p7lqKNeYRvvmLtD9wrb1mAmb", "folder_title": "1. Pinus radiata D.Don Oct25", "files": [{"name": "actas_10036.geojson", "id": "11SG6S0_kOwP3eRkbK06XevpUqRjF1bcW", "size": 5156}, {"name": "MEDUFP596028_EUDR Certificate_ZEUD.pdf", "id": "", "size": 0}]}, {"sci": "Acacia Mangium, Eucalyptus Pelita, Acacia Crassicarpa", "common": "Acacia, Eucalyptus", "supplier": "PT. Bumi Andalas Permai, PT. Bumi Mekar Hijau, PT. Sebangun Bumi Andalas", "country": "INDONESIA", "country_risk": "Standard", "place": "INDONESIA", "fm_type": "PEFC Certified", "fm_no": "IDN23220044, LSSFM-001/MUTU/IFCC-006, LSSFM-001/MUTU/IFCC-007", "forest_type": "Plantation Forest", "owner_type": "Concession Model", "start": "2026-01-24", "end": "2026-03-10", "risk": "", "pulp": "PT OKI Pulp & Paper Mills", "excel_files": ["DN_A1N0002664.geojson"], "items": ["D04004EU"], "folder": 2, "folder_id": "1K0yRXHUpOYH_DevG3hrq65G-fXy4yUzb", "folder_title": "2. Acacia Mangium, Eucalyptus Pelita, Acacia Crassicarpa Jan26", "files": [{"name": "DN_A1N0002664.geojson", "id": "1_Ta1cslM0GWlUwbVkxzLYhXqxTAWZzQD", "size": 80893}]}, {"sci": "Pinus radiata D.Don", "common": "Radiata Pine", "supplier": "Forestal Arauco S.A", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Ñuble of Chile", "fm_type": "PEFC", "fm_no": "CL21/819943415", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-01", "end": "2025-09-30", "risk": "Low", "pulp": "Celulosa Arauco y Constitución S.A - Nueva Aldea", "excel_files": ["MEDUFP705512 Geojson.geojson", "MEDUFP705512 EUDR Form.pdf", "Legal Compliance Arauco Chile EUDR.pdf"], "items": ["D04004EU", "D04023EU", "D04033EU"], "folder": 3, "folder_id": "18AEAlh4HEoHmUkJ0Wvr5COczLCcRHy8A", "folder_title": "3. Pinus radiata D.Don Aug25", "files": [{"name": "MEDUFP705512 Geojson.geojson", "id": "1ub01gCCs5OXY859V3ammzQASTLPdaNyr", "size": 74539}, {"name": "MEDUFP705512 EUDR Form.pdf", "id": "", "size": 0}, {"name": "Legal Compliance Arauco Chile EUDR.pdf", "id": "", "size": 0}]}, {"sci": "Acacia Mangium x Acacia auriculiformis", "common": "Acacia senegal", "supplier": "HOMEWEALTH PTE. LTD.", "country": "Vietnam", "country_risk": "Low", "place": "Vietnam", "fm_type": "PEFC", "fm_no": "SGSCN-CFCC-COC-001133", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2026-04-15", "end": "2026-05-08", "risk": "Low", "pulp": "Guangxi JinGui Pulp & Paper Co.,LTD", "excel_files": ["KINGWOOD V.FKL010 geojson map.geojson"], "items": ["D04004EU", "D04023EU", "D04033EU"], "folder": 4, "folder_id": "1ZysWqsUqAvYRHax9l1fg1Ayt2EIEZenk", "folder_title": "4. Acacia Mangium x Acacia auriculiformis Apr26", "files": [{"name": "KINGWOOD V.FKL010 geojson map.geojson", "id": "1MCe4RGxNEPTnMcERqEP1ZsMWbBLlsxCr", "size": 214767}]}, {"sci": "Acacia Crassicarpa, Eucalyptus Pelita", "common": "Acacia, Eucalyptus", "supplier": "PT. Arara Abadi, PT. Satria Perkasa Agung, PT. Balai Kayang Mandiri, PT. Bina Daya Bentala, PT. Perawang Sukses Perkasa Industri, PT. Riau Abadi Lestari", "country": "INDONESIA", "country_risk": "Standard", "place": "INDONESIA", "fm_type": "PEFC Certified", "fm_no": "IDN23220018, IDN23220010, IDN23220028, IDN23220039, IDN23220009, IDN23220013", "forest_type": "Plantation Forest", "owner_type": "Concession Model", "start": "2025-12-17", "end": "2026-04-17", "risk": "Low", "pulp": "PT INDAH KIAT PULP&PAPER TBK.", "excel_files": ["DN_2590016201.geojson", "DDS 2590016201 EUDR.pdf", "VL 2590016201 EUDR.pdf"], "items": ["D04004EU", "D04023EU", "D04033EU"], "folder": 5, "folder_id": "12bGmeMLxpU_4BePf4HMm5NM7_iB2ExJF", "folder_title": "5. Acacia Crassicarpa, Eucalyptus Pelita Dec25", "files": [{"name": "DN_2590016201.geojson", "id": "1IwJ5etq1sdOtzh-MMXSkQ74RHzSJS4Yt", "size": 83738}, {"name": "DDS 2590016201 EUDR.pdf", "id": "", "size": 0}, {"name": "VL 2590016201 EUDR.pdf", "id": "", "size": 0}]}, {"sci": "Acacia Crassicarpa, Eucalyptus Pelita", "common": "Acacia, Eucalyptus", "supplier": "PT. Arara Abadi, PT. Satria Perkasa Agung, PT. Bina Daya Bentala, PT. Perawang Sukses Perkasa Industri", "country": "INDONESIA", "country_risk": "Standard", "place": "INDONESIA", "fm_type": "PEFC Certified", "fm_no": "IDN23220039, IDN23220018, IDN23220028, IDN23220009", "forest_type": "Plantation Forest", "owner_type": "Concession Model", "start": "2026-06-03", "end": "2026-07-03", "risk": "Low", "pulp": "PT INDAH KIAT PULP&PAPER TBK.", "excel_files": ["DN_2590016368.geojson", "EUDR DDS 2590016368.pdf", "EUDR vlgl 2590016368.pdf"], "items": ["D04004EU", "D04023EU", "D04033EU"], "folder": 6, "folder_id": "1ASO1uqerPg6xRGeeHBq2tex-2aUO7tw2", "folder_title": "6. Acacia Crassicarpa, Eucalyptus Pelita Jun26", "files": [{"name": "DN_2590016368.geojson", "id": "1PSZdn1C5k1xdeaLfYEOuMwlRxBdNOvO1", "size": 45520}, {"name": "EUDR DDS 2590016368.pdf", "id": "", "size": 0}, {"name": "EUDR vlgl 2590016368.pdf", "id": "", "size": 0}]}, {"sci": "Acacia Crassicarpa, Eucalyptus Pelita, Acacia Mangium", "common": "Acacia, Eucalyptus", "supplier": "PT. Bumi Andalas Permai, PT. Bumi Mekar Hijau, PT. Sebangun Bumi Andalas", "country": "INDONESIA", "country_risk": "Standard", "place": "INDONESIA", "fm_type": "PEFC Certified", "fm_no": "LSSFM-001/MUTU/IFCC-006, LSSFM-001/MUTU/IFCC-007, IDN23220044", "forest_type": "Plantation Forest", "owner_type": "Concession Model", "start": "2026-02-24", "end": "2026-05-03", "risk": "", "pulp": "PT OKI Pulp & Paper Mills", "excel_files": ["DN_A1N0002808.geojson"], "items": ["D04023EU", "D01022EU"], "folder": 7, "folder_id": "1Zb54m7jvJWM2z_1pjDJJL1DigbPPuXRs", "folder_title": "7.Acacia Crassicarpa, Eucalyptus Pelita, Acacia Mangium Feb26", "files": [{"name": "DN_A1N0002808.geojson", "id": "1m5evbYSrQxOe1MR4hhH8Wf9aR37ez0mW", "size": 55096}]}, {"sci": "Eucalyptus Globulus and Eucalyptus Nitens", "common": "Eucalyptus", "supplier": "Forestal Arauco S.A.", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Nuble of Chile", "fm_type": "FSC 100%", "fm_no": "SA-FM/COC-004173", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-09-01", "end": "2025-09-30", "risk": "Low", "pulp": "Celulosa Arauco y Constituci ón S.A.", "excel_files": ["MEDUFP635321_25CE.geojson"], "items": ["D40511"], "folder": 8, "folder_id": "1FdEinHg5esCwBu-4igxcVMokVvQVvBT3", "folder_title": "8.Eucalyptus Globulus and Eucalyptus Nitens sEP25", "files": [{"name": "MEDUFP635321_25CE.geojson", "id": "1ZxKWhuzShKpAiKGO4rvSBLiyGETfDerJ", "size": 4243856}]}, {"sci": "Pinus radiata D.Don", "common": "Radiata Pine", "supplier": "Forestal Arauco S.A", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Nuble of Chile", "fm_type": "FSC 100%", "fm_no": "SA-FM/COC-004173", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-07-01", "end": "2025-08-31", "risk": "", "pulp": "Celulosa Arauco y Constitución S.A.", "excel_files": ["Jul 2025 PN1E.geojson", "MEDUFP524343_96801525 (1).geojson", "Aug 2025 PN1E.geojson"], "items": ["D40511"], "folder": 9, "folder_id": "1HE_nb551BG4gh8s8gwr-aaGZ2zmMzxcI", "folder_title": "9. Pinus radiata D.Don Jul25", "files": [{"name": "Jul 2025 PN1E.geojson", "id": "12Wahejf5J8zMSD2oZGBToLkRdgIhydhb", "size": 1491973}, {"name": "MEDUFP524343_96801525 (1).geojson", "id": "1xAqi3KvA4RIaIEuO6EldL261y14uVTjO", "size": 1491973}, {"name": "Aug 2025 PN1E.geojson", "id": "1RdrKQ1Kk5On-_CTq2xULH8BmL5Nhpoql", "size": 1731609}]}, {"sci": "Pinus radiata D.Don", "common": "Radiata Pine", "supplier": "Forestal Arauco S.A", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Nuble of Chile", "fm_type": "FSC 100%", "fm_no": "SA-FM/COC-004173", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-06-01", "end": "2025-07-31", "risk": "", "pulp": "Celulosa Arauco y Constitución S.A.", "excel_files": ["actas_10590(1).geojson", "actas_10629.geojson", "actas_10590.geojson"], "items": ["D40511"], "folder": 10, "folder_id": "1XovMLiQ23gTp0dq-O_ORxVlzgmXAhz96", "folder_title": "10. Pinus radiata D.Don Jun25", "files": [{"name": "actas_10590(1).geojson", "id": "1LuA3jrKerwu4dGy4HvrwVwZwusNEJNuc", "size": 196095}, {"name": "actas_10629.geojson", "id": "1O4D3FH_IwVY-_TeYG3gRgq99p86mG-Ai", "size": 13577}, {"name": "actas_10590.geojson", "id": "1_6LU9fGn8rhCEoxGtlouUxK8ZUZbjI-z", "size": 196095}]}, {"sci": "Eucalyptus grandis,Eucalyptus globulus, Eucalyptus dunnii，Eucalyptus smithii", "common": "Eucalyptus", "supplier": "EUFORES S.A.(Montes del Plata)", "country": "Uruguay", "country_risk": "Low", "place": "Luis Alberto de Herrera 1248,World Trade Center,Torre3Piso9,Montevideo,11100,Uruguay", "fm_type": "FSC 100%", "fm_no": "SGSCH-FM/COC-001941", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2023-04-24", "end": "2025-08-04", "risk": "", "pulp": "Celulosa Y Energia Punta Pereira S.A.(Montes del Plata)", "excel_files": ["HKPAPER_250101409_CustPO_Date_29072025_SEPO_4504133618.geojson"], "items": ["D40511"], "folder": 11, "folder_id": "1BQotHT0VGaibeTIwZK-AlHJaipQf9Bnj", "folder_title": "11. Eucalyptus grandis,Eucalyptus globulus, Eucalyptus dunnii，Eucalyptus smithii Apr23", "files": [{"name": "HKPAPER_250101409_CustPO_Date_29072025_SEPO_4504133618.geojson", "id": "1a5TUjI6JB-eWE_aysPOLFL-3X1dHyCEv", "size": 12037121}]}, {"sci": "Pinus sylvestris; Picea abies", "common": "Pine; Spruce", "supplier": "Metsa Forest", "country": "FINLAND", "country_risk": "Low", "place": "Revontulenpuisto 202100 Espoo Finland", "fm_type": "FSC 100%", "fm_no": "GFA-FM/COC-006440", "forest_type": "Naturally regenerating forest", "owner_type": "Private forest", "start": "", "end": "", "risk": "", "pulp": "Metsa Fibre Oy", "excel_files": [], "items": ["D40511", "D42012"], "folder": null, "files": []}, {"sci": "Populus davidiana", "common": "POPLAR", "supplier": "Jilin Forestry Industry Lushuihe Forestry Co., LTD.", "country": "CHINA", "country_risk": "Low", "place": "Dongshan Street, LushuiheTown, Fusong County, Jilin Province - 134506 Baishan City - CHINA", "fm_type": "FSC100%", "fm_no": "BV-FM/COC-198150", "forest_type": "Naturally regenerating forest", "owner_type": "Public forest/ State forest", "start": "2024-12-25", "end": "2025-02-28", "risk": "", "pulp": "SHANDONG BOHUI PAPER INDUSTRY CO., LTD.", "excel_files": ["4501110617.geojson"], "items": ["D40511"], "folder": 12, "folder_id": "1jodPjmiQEptz4YifY6DuRzPaI_RZJrW5", "folder_title": "12. Populus davidiana Dec24", "files": [{"name": "4501110617.geojson", "id": "1DON-P9XES-x3EWA1ww9D4AyOxPclmpLw", "size": 358}]}, {"sci": "Eucalyptus Globulus and Eucalyptus Nitens", "common": "Eucalyptus", "supplier": "Forestal Arauco S.A.", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Nuble of Chile", "fm_type": "FSC 100%", "fm_no": "SA-FM/COC-004173", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2020-12-28", "end": "2025-08-04", "risk": "Low", "pulp": "Celulosa Arauco y Constituci ón S.A.", "excel_files": ["HK_PaperSources_250102869.geojson"], "items": ["D42012"], "folder": 13, "folder_id": "1vAytqM5vZcGrqEi-pfijdVi2ehgRupMN", "folder_title": "13. Eucalyptus Globulus and Eucalyptus Nitens Dec20", "files": [{"name": "HK_PaperSources_250102869.geojson", "id": "14w0_-GpJeSUyqFpwqTDE6og61cSEncYV", "size": 17395944}]}, {"sci": "Populus davidiana", "common": "POPLAR", "supplier": "Jilin Forestry Industry Lushuihe Forestry Co., LTD.", "country": "CHINA", "country_risk": "Low", "place": "Dongshan Street, LushuiheTown, Fusong County, Jilin Province - 134506Baishan City - CHINA", "fm_type": "FSC100%", "fm_no": "BV-FM/COC-198150", "forest_type": "Naturally regenerating forest", "owner_type": "Public forest/ State forest", "start": "2024-12-28", "end": "2025-02-28", "risk": "Low", "pulp": "SHANDONG BOHUI PAPER INDUSTRY CO., LTD.", "excel_files": ["SDBH-CYAMYMCX-202601-01.geojson"], "items": ["D42012"], "folder": 14, "folder_id": "13EiAsgMZGhkhM9FpS6XLNkEntQO_VG2H", "folder_title": "14. Populus davidiana Dec24", "files": [{"name": "SDBH-CYAMYMCX-202601-01.geojson", "id": "1-wCTDkNOfvLKOgN8v4GE0O4bsLKMXn-Z", "size": 309}]}, {"sci": "Acasia crassicarpa, Acasia mangium, Eucalyptus Pelita", "common": "Thick-podded Salwood; Black Wattle; Red Mahogany", "supplier": "PT. Arara Abadi", "country": "Indonesia", "country_risk": "Standard", "place": "Indonesia", "fm_type": "PEFC Certified", "fm_no": "", "forest_type": "Plantation Forest", "owner_type": "PT. Arara Abadi", "start": "2025-03-10", "end": "2025-04-24", "risk": "Low", "pulp": "PT Indah Kiat Pulp & Paper", "excel_files": ["Geojson_ Dragon_ PT Arara Abadi.geojson"], "items": ["B04013EU"], "folder": 15, "folder_id": "1ei6KF7RwTNPK-u0uX9Lu8vnvW5sRLA0y", "folder_title": "15. Acasia crassicarpa, Acasia mangium, Eucalyptus Pelita Mar25", "files": [{"name": "Geojson_ Dragon_ PT Arara Abadi.geojson", "id": "1wKKMXQCzbXuaSq_yaWo82t_AY77Efkog", "size": 5600}]}, {"sci": "Pinus radiata, Pseudotsuga Menziesii", "common": "Monterey Pine; Douglas Fir.", "supplier": "Manulife Investment Forest Management NZ Ltd", "country": "NewZealand", "country_risk": "Low", "place": "NewZealand", "fm_type": "PEFC Certified", "fm_no": "", "forest_type": "Plantation Forest", "owner_type": "Manulife Investment Forest Management NZ Ltd", "start": "2024-11-12", "end": "2025-06-06", "risk": "", "pulp": "OJI FIBRE SOLUTIONS LTD", "excel_files": ["Geojson_ OJI_Fibre_Manulife_ Tiaki.geojson", "Geojson_OJI_Fiber_ Manulife_ OTPP.geojson"], "items": ["B04013EU"], "folder": 16, "folder_id": "1_TMPYElE8A5sw36ZSfi1Fd3Pmfou90Mn", "folder_title": "16. Pinus radiata, Pseudotsuga Menziesii Nov24", "files": [{"name": "Geojson_ OJI_Fibre_Manulife_ Tiaki.geojson", "id": "1G08P678_wBS39YNKc7yBJqEioLPIGd_g", "size": 9879}, {"name": "Geojson_OJI_Fiber_ Manulife_ OTPP.geojson", "id": "18yFpPfBjcyz2PqZ8QMXZqLeaQd8SRNqP", "size": 29518}]}, {"sci": "Pinus radiata, Pseudotsuga Menziesii", "common": "Monterey Pine; Douglas Fir.", "supplier": "Timberlands Ltd", "country": "NewZealand", "country_risk": "Low", "place": "NewZealand", "fm_type": "PEFC Certified", "fm_no": "", "forest_type": "Plantation Forest", "owner_type": "Timberlands Ltd", "start": "2024-11-12", "end": "2025-06-06", "risk": "", "pulp": "", "excel_files": ["Geojson_OJI_Fiber_ Timberlands_ KTML.geojson"], "items": ["B04013EU"], "folder": 17, "folder_id": "1dZTvUEcH4L2leon7diQu75FujKEl2gfT", "folder_title": "17. Pinus radiata, Pseudotsuga Menziesii Nov24", "files": [{"name": "Geojson_OJI_Fiber_ Timberlands_ KTML.geojson", "id": "1pa0F4FBWLApzzYP-DwlPdkqDxE-U9F1M", "size": 162745}]}, {"sci": "Pinus radiata D.Don", "common": "Radiata Pine", "supplier": "Forestal Arauco S.A", "country": "Chile", "country_risk": "Low", "place": "Libertador General Bernardo O’Higgins; Maule, Bio Bio; La Araucanía; Los Lagos and Ñuble of Chile", "fm_type": "PEFC FM", "fm_no": "", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-05-01", "end": "2025-05-31", "risk": "Low", "pulp": "Celulosa Arauco y Constitución S.A - Nueva Aldea", "excel_files": ["May 2025 PN1E.geojson", "May 2025 PA2E.geojson"], "items": ["B04013EU"], "folder": 18, "folder_id": "1XQAmZf0zOeENOSP9zAw59PtNFqlCr1R-", "folder_title": "18. Pinus radiata D.Don May25", "files": [{"name": "May 2025 PN1E.geojson", "id": "11WqNHhZd1YY_mLHyMGhHMnSYA6aVZDZz", "size": 3475298}, {"name": "May 2025 PA2E.geojson", "id": "1dqJ2mrLasZHokHo2W8DDqf-QzG0uWjZJ", "size": 4197363}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Jin-Qingyuan Timberland（Paper mill）Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "100%PEFC CERTIFIED", "fm_no": "CFCC/PEFC-FM-ZTFC-000007", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-01", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500916924-Aug.geojson", "4500916924（SEP) .geojson"], "items": ["B04013EU"], "folder": 19, "folder_id": "1u4dArgObB3v0W8EK7FzA0XwUfVw-am2R", "folder_title": "19. Eucalyptus grandis 01-Aug25", "files": [{"name": "4500916924-Aug.geojson", "id": "108G_NIgiY9v2KxgjabJiAIFEcTDHBszj", "size": 10699}, {"name": "4500916924（SEP) .geojson", "id": "1GVmGidl5Mh8K5ijOQrZAUWIIsRaiZ2I6", "size": 7660}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Jin-Qingyuan Timberland（Paper mill）Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000007", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2024-12-25", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500724916-Aug.geojson", "4500724916-2025.Jan-Jun.geojson", "4500724916-Jul.geojson"], "items": ["B04013EU"], "folder": 20, "folder_id": "1ukvtwIweBnyLdH31mssR5RjrQaad6whn", "folder_title": "20. Eucalyptus grandis Dec24", "files": [{"name": "4500724916-Aug.geojson", "id": "1jkC2GbuPS36tlJSyF00GAZ-Pru9eJhhB", "size": 5633}, {"name": "4500724916-2025.Jan-Jun.geojson", "id": "1FHEGzYTTife7Cz6ri9ISedRFvm9_1Htx", "size": 37579}, {"name": "4500724916-Jul.geojson", "id": "1JxtwYFvFUjkQ3EyY-ogwvKZ4Jnb8oMZn", "size": 11217}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Jin-Qingyuan Timberland（Paper mill）Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000007", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-29", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500963867-Oct.geojson", "4500963867（DEC).geojson", "4500963867（SEP) .geojson", "4500963867（Jan).geojson", "4500963867(Nov).geojson"], "items": ["B04013EU"], "folder": 21, "folder_id": "1M8gduJebtZxac833pr2Lgwg4dwADU609", "folder_title": "21. Eucalyptus grandis 29-Aug25", "files": [{"name": "4500963867-Oct.geojson", "id": "166e49YLYpKF0vBuaSMGXJoWHDxTRlbk2", "size": 12726}, {"name": "4500963867（DEC).geojson", "id": "1R2Gz1w4Gw36T7dobrem0AXt5XjBa2jrS", "size": 15261}, {"name": "4500963867（SEP) .geojson", "id": "1e3VJfcjthFLeSj5nmaneYQKRHeoad-XX", "size": 9688}, {"name": "4500963867（Jan).geojson", "id": "1RAOJKzULhFVttHstlGqGbO6eZ9PAA9bj", "size": 5628}, {"name": "4500963867(Nov).geojson", "id": "1FSErNxaTXFPI0yIDainwMUXIRufTKH5A", "size": 14241}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Leizhou Jin-taiyang Science and Tech Forestry Ltd", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000030", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-27", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500959413(SEP)  .geojson", "4500959413-Oct.geojson", "4500959413(DEC).geojson", "4500959413(Nov).geojson", "4500959413(JAN).geojson"], "items": ["B04013EU"], "folder": 22, "folder_id": "1M_mpj7IR3_UhUztSUrM38OXF_aHwepzX", "folder_title": "22. Eucalyptus grandis 27-Aug25", "files": [{"name": "4500959413(SEP)  .geojson", "id": "1hBwL-q8VGDEKIyqg1ThPXry6B_f9Zj4g", "size": 4105}, {"name": "4500959413-Oct.geojson", "id": "1c46HHC0s5wpTcM7tasbn2Mzup3GWECcK", "size": 10705}, {"name": "4500959413(DEC).geojson", "id": "13X4ng2GelBvVQQIOfdCK2mSdUGa5wXy8", "size": 2590}, {"name": "4500959413(Nov).geojson", "id": "1K12bHeJ_c9uXSkvw1QeusDOE8g3x1ruB", "size": 497}, {"name": "4500959413(JAN).geojson", "id": "1rlWDuM-Rc4hUU1WhNg3L_-RVUKt3iSOr", "size": 2082}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Shaoguan Jin-Shaoguan First Quality Timberland（Paper mill）Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000008", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-08", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500917045-Aug.geojson", "4500917045（SEP) .geojson"], "items": ["B04013EU"], "folder": 23, "folder_id": "16awgdvFUewL6h4Bh9f5vbk8ZUZBkoWTj", "folder_title": "23. Eucalyptus grandis 08-Aug25", "files": [{"name": "4500917045-Aug.geojson", "id": "1watFLzHlUpsV-CcEc4L0By2PWJBkTsuo", "size": 13729}, {"name": "4500917045（SEP) .geojson", "id": "11aaZCqvO-dDQi4-ra3hY1gt9AkA9tUAZ", "size": 8659}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Shaoguan Jin-Shaoguan First Quality Timberland（Paper mill）Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000008", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-29", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500963905(DEC).geojson", "4500963905-Oct.geojson", "4500963905（SEP).geojson", "4500963905(Nov).geojson", "4500963905(Jan).geojson"], "items": ["B04013EU"], "folder": 24, "folder_id": "1m1Jb_lTQFqMURoQxqfl-HjbgfsdmU2ng", "folder_title": "24. Eucalyptus grandis 29-Aug25", "files": [{"name": "4500963905(DEC).geojson", "id": "1AiCrL6w7wE3zf62zTvxNvAgscD7fhDax", "size": 9174}, {"name": "4500963905-Oct.geojson", "id": "1xR3N6SZLV1rSd0bgZ9zJaX-PmzTygiao", "size": 10705}, {"name": "4500963905（SEP).geojson", "id": "1Xca4p5h6-Mb7qOkyCsmMuwiEFU5_Hy72", "size": 14747}, {"name": "4500963905(Nov).geojson", "id": "1Kfa6KV--G0-I4ZPBH5QbvbtiuUTJmqA7", "size": 11719}, {"name": "4500963905(Jan).geojson", "id": "1OfempCQ63sZJVSvmnwEjaITkD9UtFoTA", "size": 3603}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Shaoguan Jin-Shaoguan First Quality Timberland（Paper mill）Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000008", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2024-12-25", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500724920-Aug.geojson", "4500724920-2025.Jan-Jun.geojson", "4500724920-Jul.geojson"], "items": ["B04013EU"], "folder": 25, "folder_id": "1U_njvm8FzIM2JRdTjp8XpASmK1dbmshD", "folder_title": "25. Eucalyptus grandis 25-Dec24", "files": [{"name": "4500724920-Aug.geojson", "id": "1Uci7wmO9JehCcMSC8_GZ_v55jnrNO4A7", "size": 5631}, {"name": "4500724920-2025.Jan-Jun.geojson", "id": "1CUK7oxKflGhsDIUELKaasyPOiGMLdXwg", "size": 38100}, {"name": "4500724920-Jul.geojson", "id": "11CdmKHBl63S0Sm8hK5gpqd7U5rOp0MLP", "size": 16282}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Xinjiu（Guangdong)Forestry Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "100%PEFC CERTIFIED", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-01", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500916962（SEP) .geojson", "4500916962-Aug.geojson"], "items": ["B04013EU"], "folder": 26, "folder_id": "1Bezv85AQvwTAY8spjaFyYBzNVlE7KWGs", "folder_title": "26. Eucalyptus grandis 01-Aug25", "files": [{"name": "4500916962（SEP) .geojson", "id": "1eeKy5FMyUi_2ZmmZ3r9G5FYvsvo_wGnt", "size": 7660}, {"name": "4500916962-Aug.geojson", "id": "1H8UlsWk_vUbiYlfsycuOFHmBZNGxunBs", "size": 3094}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Xinjiu（Guangdong)Forestry Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-27", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500959726-Oct.geojson", "4500959726(Nov).geojson"], "items": ["B04013EU"], "folder": 27, "folder_id": "180A440fYGpZ6Qfqv5M1k1OqN2W7Vo0Ni", "folder_title": "27. Eucalyptus grandis 27-Aug25", "files": [{"name": "4500959726-Oct.geojson", "id": "17qYSXogrFSUFs7xKnaqycuzeQNb_xmU8", "size": 2075}, {"name": "4500959726(Nov).geojson", "id": "1ilS9AHB2MI77IfQPX3k_y2gZyl7R91ea", "size": 2591}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Xinjiu（Guangdong)Forestry Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-29", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500963870-Oct.geojson", "4500963870（SEP) .geojson"], "items": ["B04013EU"], "folder": 28, "folder_id": "1x1CElh-MUGE8i-hJg3nEiQt_wRoYfRzK", "folder_title": "28. Eucalyptus grandis 29-Aug25", "files": [{"name": "4500963870-Oct.geojson", "id": "197rx2qZ7Q06tJOF-WtrZUpXkjuM3xBv0", "size": 1577}, {"name": "4500963870（SEP) .geojson", "id": "1J2fUTitB34Bb3C_nleOzdgZecI7Qk5ll", "size": 3099}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Xinjiu（Guangdong)Forestry Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-02-10", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500744506-Jul.geojson", "4500744506-Aug.geojson"], "items": ["B04013EU"], "folder": 29, "folder_id": "1KiIccbmq0MCTlaVA2cltFgBfuE76c-GB", "folder_title": "29. Eucalyptus grandis 10-Feb25", "files": [{"name": "4500744506-Jul.geojson", "id": "1d8Pb3c6MPxB3rUw9rKoxATubIblzUlua", "size": 2083}, {"name": "4500744506-Aug.geojson", "id": "19TcBHi6r6l999KsF8BJJ9Hahjb8SX6P8", "size": 1577}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Yangjiang Jin-taiyang Science and Tech Forestry Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000030", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-27", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500959410-Aug.geojson", "4500959410(sep).geojson", "4500959410（Jan).geojson", "4500959410（DEC).geojson", "4500959410-Oct.geojson", "4500959410(Nov).geojson"], "items": ["B04013EU"], "folder": 30, "folder_id": "12vTW0y75qEBYqccT9k8dVFIRHhp7D5ol", "folder_title": "30. Eucalyptus grandis 27-Aug25", "files": [{"name": "4500959410-Aug.geojson", "id": "1RqVI5S6RrhkTwLsqZih0vX0vr7v1kGjf", "size": 1065}, {"name": "4500959410(sep).geojson", "id": "1t5DflB17g78TE2HaeYjcoA-OeckfprXm", "size": 2587}, {"name": "4500959410（Jan).geojson", "id": "1XEBZE2a-M49GtZ5gnnvdSBlEA-55iruu", "size": 3607}, {"name": "4500959410（DEC).geojson", "id": "1sEQEK04tCMuhmavTauUxZVRk29UpQfLF", "size": 15774}, {"name": "4500959410-Oct.geojson", "id": "15OrxQ4pcdNeDDdiv-EE3m5787ro7wH-i", "size": 10705}, {"name": "4500959410(Nov).geojson", "id": "1zb4kH0gGfvCKRk9GKGqF2rAhiTvUc8z1", "size": 9677}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Zhaoqing Jiayao Forestry economy development Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-29", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500963901-Oct.geojson", "4500963901(Nov).geojson", "4500963901(DEC).geojson", "4500963901(SEP).geojson"], "items": ["B04013EU"], "folder": 31, "folder_id": "1wCrl2YqC9DYwfrz5_NAKZTbZWgXcAE2m", "folder_title": "31. Eucalyptus grandis 29-Aug25", "files": [{"name": "4500963901-Oct.geojson", "id": "1Rz_WHC698UBGWetmCmLy6CgPDgDP2NIR", "size": 4613}, {"name": "4500963901(Nov).geojson", "id": "1nfKNg1xBc5L6MEn0-pLrL42cy_zA4xMH", "size": 1575}, {"name": "4500963901(DEC).geojson", "id": "1p5s7zWCx5M2ifDQCk4yLsGq3jeCnit4p", "size": 497}, {"name": "4500963901(SEP).geojson", "id": "1Wcr4pRAIWHX1uMJbiccbctzCfUQafIGU", "size": 4107}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Zhaoqing Jiayao Forestry economy development Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2024-12-25", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500724924-Aug.geojson", "4500724924-2025.Jan-Jun.geojson", "4500724924-Jul.geojson"], "items": ["B04013EU"], "folder": 32, "folder_id": "1iiFoqvuiSSHw5C7g01NSsVQOYYDtTwJ3", "folder_title": "32. Eucalyptus grandis 25-Dec24", "files": [{"name": "4500724924-Aug.geojson", "id": "1rI6hkHVcMoaNmr9t1_biVtdWi16dFSor", "size": 3094}, {"name": "4500724924-2025.Jan-Jun.geojson", "id": "1vDSr4UbDXwLUAFzAPc4WF5IzFonaOGTL", "size": 16268}, {"name": "4500724924-Jul.geojson", "id": "1AQmCGQIVogfAiSn7weBiuFq3BTzbNZUM", "size": 8169}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Zhaoqing Jiayao Forestry economy development Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "PEFC", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-27", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500959640(SEP) .geojson", "4500959640-Oct.geojson", "4500959640(Nov).geojson", "4500959640-Aug.geojson", "4500959640(DEC).geojson"], "items": ["B04013EU"], "folder": 33, "folder_id": "1F2wsBUwzmz6DpmjF7IrJZdn_7gDc3u-B", "folder_title": "33. Eucalyptus grandis 27-Aug25", "files": [{"name": "4500959640(SEP) .geojson", "id": "1_nB7skNP81pVMmCUgUSJngykSmnZZVxe", "size": 11711}, {"name": "4500959640-Oct.geojson", "id": "1YFe2jLQgdEzivRj2BJXOMBab7rvEef3D", "size": 17290}, {"name": "4500959640(Nov).geojson", "id": "1YLJVgHgKKy7kwYd4hvxLs_YQLejn0NxK", "size": 22870}, {"name": "4500959640-Aug.geojson", "id": "1DNYYxyqe6anpaIg-H0UFvMiJIQQu3WC6", "size": 1569}, {"name": "4500959640(DEC).geojson", "id": "1L1ZqjXIM6zAHhfQM3rjYytyX5K3cx6Mr", "size": 14749}]}, {"sci": "Eucalyptus grandis", "common": "Rose Eucalyptus", "supplier": "Zhaoqing Jiayao Forestryeconomy development Company Ltd.", "country": "china", "country_risk": "Low", "place": "South of China", "fm_type": "100%PEFC CERTIFIED", "fm_no": "CFCC/PEFC-FM-ZTFC-000061", "forest_type": "Plantation forest", "owner_type": "Private forest", "start": "2025-08-01", "end": "2025-12-31", "risk": "", "pulp": "Ningbo Asia Pulp & Paper Co.,LTD", "excel_files": ["4500917022-Aug.geojson", "4500917022（SEP) .geojson"], "items": ["B04013EU"], "folder": 34, "folder_id": "1t4fX5UnO8ilLtDEQPcq_4TgJvi9aDZDQ", "folder_title": "34. Eucalyptus grandis 01-Aug25", "files": [{"name": "4500917022-Aug.geojson", "id": "1-WJghqsqCbZTycILcuwm_rrZsPPNouYv", "size": 5628}, {"name": "4500917022（SEP) .geojson", "id": "1nzZy62tUUmijGrDpf2sTGJ3udxLvO65V", "size": 1574}]}, {"sci": "Acacia Crassicarpa, Eucalyptus Pelita, Acacia Mangium", "common": "Acacia, Eucalyptus", "supplier": "PT. Bumi Andalas Permai, PT. Bumi Mekar Hijau, PT. Sebangun Bumi Andalas", "country": "INDONESIA", "country_risk": "Standard", "place": "INDONESIA", "fm_type": "PEFC Certified", "fm_no": "IDN23220044, LSSFM-001/MUTU/IFCC-006, LSSFM-001/MUTU/IFCC-007", "forest_type": "Plantation Forest", "owner_type": "Concession Model", "start": "2025-07-10", "end": "2025-09-03", "risk": "", "pulp": "PT OKI Pulp & Paper Mills", "excel_files": ["DN_A1N0002269.geojson", "250729 APP EUDR DDS - A1N0002269.pdf"], "items": ["B04013EU"], "folder": 35, "folder_id": "1J4SmpI8NAADn1kBrH3BCGw2UK1yg0LGK", "folder_title": "35. Acacia Crassicarpa, Eucalyptus Pelita, Acacia Mangium 10-Jul25", "files": [{"name": "DN_A1N0002269.geojson", "id": "1KsgYsPeB-LvQsUNpmZZn0GqwZyFie3S2", "size": 71478}, {"name": "250729 APP EUDR DDS - A1N0002269.pdf", "id": "", "size": 0}]}]};
 
 // Chuẩn hoá tên file để so khớp: bỏ dấu cách, gạch, đuôi file, không phân biệt hoa thường
 function normName(s) {
@@ -575,9 +682,37 @@ const DRIVE_INDEX = (() => {
   Object.keys(DRIVE.files).forEach(k => { idx[normName(k)] = DRIVE.files[k]; });
   return idx;
 })();
+// Lấy ID file từ ID hoặc link Drive
+function driveId(v) {
+  if (!v) return '';
+  const m = String(v).match(/\/d\/([\w-]{20,})|[?&]id=([\w-]{20,})/);
+  return m ? (m[1] || m[2]) : (/^[\w-]{20,}$/.test(v) ? v : '');
+}
+// Link tải thẳng file (không mở trang xem trước của Drive)
+const dlUrl = v => { const id = driveId(v); return id ? 'https://drive.google.com/uc?export=download&id=' + id : v; };
+const folderUrl = id => 'https://drive.google.com/drive/folders/' + id;
 function driveUrl(v) {
   if (!v) return '';
-  return /^https?:\/\//i.test(v) ? v : 'https://drive.google.com/file/d/' + v + '/view';
+  return driveId(v) ? dlUrl(v) : v;
+}
+const fmtSize = b => !b ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+function dlBtn(f) {
+  return f.id
+    ? `<a class="dl-file" href="${esc(dlUrl(f.id))}" download="${esc(f.name)}" title="${esc(f.name)}">
+         <span class="ic">⬇</span><span class="nm">${esc(f.name)}</span><span class="sz">${fmtSize(f.size)}</span></a>`
+    : `<span class="dl-file off" title="${esc(T.not_on_drive)}"><span class="ic">·</span><span class="nm">${esc(f.name)}</span><span class="sz">${T.not_on_drive}</span></span>`;
+}
+// Tải lần lượt mọi file của 1 khu rừng (mỗi file cách nhau một chút để trình duyệt không chặn)
+function downloadLot(po, folder) {
+  const lot = (FOREST_LOTS[po] || []).find(l => l.folder === folder);
+  if (!lot) return;
+  lot.files.filter(f => f.id).forEach((f, i) => setTimeout(() => {
+    const fr = document.createElement('iframe');
+    fr.style.display = 'none';
+    fr.src = dlUrl(f.id);
+    document.body.appendChild(fr);
+    setTimeout(() => fr.remove(), 60000);
+  }, i * 900));
 }
 // Trả về link file nếu đã có trong bảng ánh xạ, chưa có thì mở thư mục chung
 function fileUrl(name) {
@@ -699,6 +834,7 @@ function renderRecord(code, itemCode) {
   AGG = mergedPo(PRODS);
   const p = AGG;                                   // mục 01, 03-06 dùng dữ liệu toàn PO
   const fg = forestGroups(AGG), pg = pulpGroups(AGG);
+  const lots = FOREST_LOTS[PO] || [];
   MAPF = fg;
   const countries = uniq(fg.map(f => f.country).filter(Boolean));
   const totCases = sumBy(PRODS, 'cases'), totNw = sumBy(PRODS, 'nw');
@@ -835,45 +971,49 @@ function renderRecord(code, itemCode) {
     </div>
   </div>
 
-  <!-- 04 DANH SÁCH KHU RỪNG -->
+  <!-- 04 DANH SÁCH KHU RỪNG (khớp file Excel + thư mục Drive) -->
   <div class="section">
     <div class="section-head">
       <div class="section-title"><span class="step">04</span> ${T.sec4}</div>
-      <div class="section-sub">${AGG.sources.length} ${T.sec4_sub} · ${PRODS.length} ${T.u_items}</div>
+      <div class="section-sub">${T.lot_sub(lots.length, lots.filter(l => l.folder).length, lots.reduce((s, l) => s + l.files.filter(f => f.id).length, 0))}</div>
     </div>
     <div class="tbl-card"><div class="tbl-scroll">
       <table class="data forest-table"><thead><tr>
-        <th>Forest supplier</th><th>Scientific name</th><th>Common name</th>
+        <th>${T.th_lot}</th><th>Forest supplier</th><th class="files-col">${T.th_files}</th><th>Scientific name</th><th>Common name</th>
         <th>Country</th><th>Production place</th><th>FM cert type</th><th>FM cert number</th>
         <th>Forest type</th><th>Forest owner type</th><th>Harvest started</th><th>Harvest ended</th>
-        <th>Risk</th><th>Latitude</th><th>Longitude</th><th>Attachment</th></tr></thead>
-      <tbody>${[...fg].sort((x, y) => (y.geoKeys || []).length - (x.geoKeys || []).length).map(f => `<tr>
-        <td><b>${esc(f.supplier)}</b></td>
-        <td>${dash(f.sci)}</td>
-        <td>${dash(f.common)}</td>
-        <td>${dash(f.country)}</td>
-        <td>${dash(f.place)}</td>
-        <td>${dash(f.fm_type)}</td>
-        <td class="mono" style="font-size:11px">${dash(f.fm_no)}</td>
-        <td>${dash(f.forest_type)}</td>
-        <td>${dash(f.owner_type)}</td>
-        <td class="mono">${dmy(f.start)}</td>
-        <td class="mono">${dmy(f.end)}</td>
-        <td>${risk(f.total_risk || f.risk)}</td>
-        <td class="mono">${(f.geoKeys || []).length ? esc(f.lat) : `<span class="chip none">${T.no_coord}</span>`}</td>
-        <td class="mono">${(f.geoKeys || []).length ? esc(f.lng) : `<span class="chip none">${T.no_coord}</span>`}</td>
-        <td>${f.atts.length
-          ? (f.atts.length === 1
-              ? `<a class="drive-btn sm${hasFile(f.atts[0]) ? '' : ' ghost'}" href="${esc(geoLink(f.atts[0]))}" target="_blank" rel="noopener" title="${esc(f.atts[0])}">${fileKind(f.atts[0])} ↗</a>`
-              : `<a class="drive-btn sm" href="${esc(DRIVE_FOLDER)}" target="_blank" rel="noopener" title="${esc(f.atts.join(' · '))}">${f.atts.length} file ↗</a>`)
-          : '<span class="chip none">—</span>'}</td>
-      </tr>`).join('')}</tbody></table>
+        <th>Risk</th><th>${T.th_items}</th></tr></thead>
+      <tbody>${lots.map(l => {
+        const ok = l.files.filter(f => f.id);
+        return `<tr>
+        <td class="mono lot-no">${l.folder ? `<a class="lot-link" href="${esc(folderUrl(l.folder_id))}" target="_blank" rel="noopener" title="${esc(l.folder_title)}">${l.folder}</a>` : '<span class="chip none">—</span>'}</td>
+        <td><b>${esc(l.supplier)}</b></td>
+        <td class="files-col">${l.files.length
+          ? `<div class="dl-list">${l.files.map(dlBtn).join('')}</div>
+             <div class="dl-actions">
+               ${ok.length > 1 ? `<button class="drive-btn sm" onclick="downloadLot('${esc(PO)}', ${l.folder})" title="${esc(T.dl_hint)}">${T.dl_all(ok.length)}</button>` : ''}
+               ${l.folder_id ? `<a class="drive-btn sm ghost" href="${esc(folderUrl(l.folder_id))}" target="_blank" rel="noopener">${T.dl_folder}</a>` : ''}
+             </div>`
+          : `<span class="chip none">${T.no_file_xls}</span>`}</td>
+        <td>${dash(l.sci)}</td>
+        <td>${dash(l.common)}</td>
+        <td>${dash(l.country)}</td>
+        <td>${dash(l.place)}</td>
+        <td>${dash(l.fm_type)}</td>
+        <td class="mono" style="font-size:11px">${dash(l.fm_no)}</td>
+        <td>${dash(l.forest_type)}</td>
+        <td>${dash(l.owner_type)}</td>
+        <td class="mono">${dmy(l.start)}</td>
+        <td class="mono">${dmy(l.end)}</td>
+        <td>${risk(l.risk || l.country_risk)}</td>
+        <td class="mono" style="font-size:11px">${l.items.map(esc).join('<br>')}</td>
+      </tr>`; }).join('')}</tbody></table>
     </div></div>
     <div class="totals-row">
-      <div class="cell"><div class="lbl">${T.tot_forest}</div><div class="val">${fg.length}</div></div>
-      <div class="cell"><div class="lbl">${T.tot_country}</div><div class="val">${countries.map(esc).join(' · ') || '—'}</div></div>
+      <div class="cell"><div class="lbl">${T.tot_forest}</div><div class="val">${uniq(lots.map(l => l.supplier)).length}</div></div>
+      <div class="cell"><div class="lbl">${T.tot_country}</div><div class="val">${uniq(lots.map(l => (l.country || '').toUpperCase()).filter(Boolean)).map(esc).join(' · ') || '—'}</div></div>
       <div class="cell"><div class="lbl">${T.tot_cert}</div>
-        <div class="val">${fg.filter(f => f.fm_type).length}/${fg.length}</div></div>
+        <div class="val">${lots.filter(l => l.fm_type).length}/${lots.length}</div></div>
     </div>
   </div>
 
