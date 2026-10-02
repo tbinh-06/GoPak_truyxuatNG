@@ -231,8 +231,13 @@ table.data.boxed{border:1px solid var(--border);border-radius:var(--radius);over
 table.forest-table{width:100%;min-width:1760px;font-size:12px;}
 table.forest-table th,table.forest-table td{padding:9px 11px;white-space:normal;vertical-align:top;}
 table.forest-table th{line-height:1.3;}
-table.forest-table{min-width:2050px;}
-table.forest-table td.files-col,table.forest-table th.files-col{min-width:340px;}
+table.forest-table{min-width:1900px;}
+table.forest-table td.files-col,table.forest-table th.files-col{min-width:190px;}
+.dl-folder{display:inline-flex;align-items:center;gap:6px;background:var(--brand);color:#fff;border:1px solid var(--brand);
+  border-radius:8px;padding:7px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.dl-folder:hover{background:var(--brand-dark);border-color:var(--brand-dark);}
+.dl-meta{font-size:11px;color:var(--muted);margin-top:5px;}
+.dl-meta .miss{color:var(--amber);}
 .lot-no{text-align:center;}
 .lot-link{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:50%;
   background:var(--green-bg);color:var(--brand-dark);font-weight:700;text-decoration:none;}
@@ -456,9 +461,10 @@ const I18N = {
     zoom_all: '↺ Xem toàn bộ',
     sec4: 'Danh sách khu rừng', sec4_sub: 'dòng nguồn trong hồ sơ',
     lot_sub: (n, f, k) => `${n} khu rừng theo file Excel · ${f} thư mục Drive · ${k} file tải được`,
-    th_lot: 'Thư mục', th_items: 'Mã hàng', th_files: 'File đính kèm (bấm để tải)',
+    th_lot: 'Thư mục', th_items: 'Mã hàng', th_files: 'Tải về',
     dl_all: n => `⬇ Tải cả ${n} file`, dl_folder: 'Thư mục Drive ↗', not_on_drive: 'chưa có trên Drive',
-    no_file_xls: 'Excel không ghi file', dl_hint: 'Trình duyệt có thể hỏi cho phép tải nhiều file, bấm Cho phép.',
+    no_file_xls: 'Excel không ghi file', dl_folder_btn: n => `Tải thư mục ${n}`,
+    dl_meta: (n, s) => `${n} file · ${s}`, dl_miss: n => `${n} PDF chưa có trên Drive`, dl_hint: 'Trình duyệt có thể hỏi cho phép tải nhiều file, bấm Cho phép.',
     th_coord: 'Toạ độ', no_coord: 'chưa có', n_rows: 'dòng nguồn',
     tot_forest: 'Tổng chủ rừng', tot_country: 'Quốc gia khai thác', tot_cert: 'Rừng trồng có chứng nhận',
     v4_no2: n => `, ${n} chủ rừng chưa có file`,
@@ -520,9 +526,10 @@ const I18N = {
     zoom_all: '↺ View all',
     sec4: 'Forest list', sec4_sub: 'source rows in the file',
     lot_sub: (n, f, k) => `${n} forest lots from the Excel file · ${f} Drive folders · ${k} downloadable files`,
-    th_lot: 'Folder', th_items: 'Items', th_files: 'Attachments (click to download)',
+    th_lot: 'Folder', th_items: 'Items', th_files: 'Download',
     dl_all: n => `⬇ Download all ${n}`, dl_folder: 'Drive folder ↗', not_on_drive: 'not on Drive yet',
-    no_file_xls: 'No file listed in Excel', dl_hint: 'Your browser may ask to allow multiple downloads — choose Allow.',
+    no_file_xls: 'No file listed in Excel', dl_folder_btn: n => `Download folder ${n}`,
+    dl_meta: (n, s) => `${n} files · ${s}`, dl_miss: n => `${n} PDF not on Drive yet`, dl_hint: 'Your browser may ask to allow multiple downloads — choose Allow.',
     th_coord: 'Coordinates', no_coord: 'not provided', n_rows: 'source rows',
     tot_forest: 'Forest suppliers', tot_country: 'Countries of harvest', tot_cert: 'Certified plantations',
     v4_no2: n => `, ${n} suppliers without a file`,
@@ -988,12 +995,11 @@ function renderRecord(code, itemCode) {
         return `<tr>
         <td class="mono lot-no">${l.folder ? `<a class="lot-link" href="${esc(folderUrl(l.folder_id))}" target="_blank" rel="noopener" title="${esc(l.folder_title)}">${l.folder}</a>` : '<span class="chip none">—</span>'}</td>
         <td><b>${esc(l.supplier)}</b></td>
-        <td class="files-col">${l.files.length
-          ? `<div class="dl-list">${l.files.map(dlBtn).join('')}</div>
-             <div class="dl-actions">
-               ${ok.length > 1 ? `<button class="drive-btn sm" onclick="downloadLot('${esc(PO)}', ${l.folder})" title="${esc(T.dl_hint)}">${T.dl_all(ok.length)}</button>` : ''}
-               ${l.folder_id ? `<a class="drive-btn sm ghost" href="${esc(folderUrl(l.folder_id))}" target="_blank" rel="noopener">${T.dl_folder}</a>` : ''}
-             </div>`
+        <td class="files-col">${ok.length
+          ? `<button class="dl-folder" onclick="downloadLot('${esc(PO)}', ${l.folder})"
+               title="${esc(ok.map(f => f.name).join('\n'))}">⬇ ${T.dl_folder_btn(l.folder)}</button>
+             <div class="dl-meta">${T.dl_meta(ok.length, fmtSize(ok.reduce((s, f) => s + (f.size || 0), 0)))}${
+               l.files.length > ok.length ? ` · <span class="miss">${T.dl_miss(l.files.length - ok.length)}</span>` : ''}</div>`
           : `<span class="chip none">${T.no_file_xls}</span>`}</td>
         <td>${dash(l.sci)}</td>
         <td>${dash(l.common)}</td>
